@@ -432,4 +432,573 @@ function ContentTable({ content, setContent }) {
                   <td className="px-5 py-3.5 text-zinc-400">{c.type}</td>
                   <td className="px-5 py-3.5">
                     {c.streaming_link ? (
-                      <a href={c.s
+                       <a href={c.streaming_link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs text-amber-400 hover:underline">
+                        <LinkIcon size={12} /> Streaming link
+                      </a>) : (
+                      <span className="inline-flex items-center gap-1.5 text-xs text-zinc-500">
+                        <Check size={12} /> File
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-5 py-3.5"><StatusPill status={c.status} /></td>
+                  <td className="px-5 py-3.5 text-zinc-400 font-mono text-xs">{formatCount(c.views)}</td>
+                  <td className="px-5 py-3.5 text-zinc-500 font-mono text-xs">{c.created_at ? c.created_at.slice(0, 10) : ""}</td>
+                  <td className="px-5 py-3.5">
+                    <div className="flex items-center gap-1 justify-end">
+                      <button onClick={() => toggleStatus(c.id, c.status)} title={c.status === "Published" ? "Unpublish" : "Publish"} className="p-1.5 text-zinc-500 hover:text-amber-400 hover:bg-amber-500/10 rounded-md transition-colors"><Edit3 size={14} /></button>
+                      <button onClick={() => remove(c.id)} title="Delete" className="p-1.5 text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-md transition-colors"><Trash2 size={14} /></button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function GistManager({ gist, setGist }) {
+  const [open, setOpen] = useState(false);
+  const [title, setTitle] = useState("");
+  const [category, setCategory] = useState("Community");
+  const [body, setBody] = useState("");
+  const [coverFile, setCoverFile] = useState(null);
+  const [coverPreview, setCoverPreview] = useState("");
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const resetForm = () => {
+    setTitle(""); setCategory("Community"); setBody("");
+    setCoverFile(null); setCoverPreview(""); setError(""); setOpen(false);
+  };
+
+  const handleCoverSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setCoverFile(file);
+    setCoverPreview(URL.createObjectURL(file));
+  };
+
+  const publish = async () => {
+    setError("");
+    if (!title.trim()) {
+      setError("Headline is required.");
+      return;
+    }
+    setSubmitting(true);
+
+    let coverUrl = null;
+    if (coverFile) {
+      const ext = coverFile.name.split(".").pop();
+      const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      const { error: uploadError } = await supabase.storage.from("covers").upload(path, coverFile);
+      if (uploadError) {
+        setError("Cover image upload failed: " + uploadError.message);
+        setSubmitting(false);
+        return;
+      }
+      const { data: urlData } = supabase.storage.from("covers").getPublicUrl(path);
+      coverUrl = urlData.publicUrl;
+    }
+
+    const { data, error: insertError } = await supabase
+      .from("gist_articles")
+      .insert({ title: title.trim(), category, body: body.trim() || null, cover_url: coverUrl, status: "Draft", reads: 0 })
+      .select()
+      .single();
+    setSubmitting(false);
+
+    if (insertError) {
+      setError("Couldn't save: " + insertError.message);
+      return;
+    }
+    setGist([data, ...gist]);
+    resetForm();
+  };
+
+  const toggleStatus = async (id, currentStatus) => {
+    const newStatus = currentStatus === "Published" ? "Draft" : "Published";
+    setGist(gist.map(g => g.id === id ? { ...g, status: newStatus } : g));
+    const { error } = await supabase.from("gist_articles").update({ status: newStatus }).eq("id", id);
+    if (error) setGist(gist.map(g => g.id === id ? { ...g, status: currentStatus } : g));
+  };
+
+  const remove = async (id) => {
+    const prev = gist;
+    setGist(gist.filter(g => g.id !== id));
+    const { error } = await supabase.from("gist_articles").delete().eq("id", id);
+    if (error) setGist(prev);
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-5">
+        <div>
+          <h2 className="text-xl font-semibold text-zinc-50" style={{ fontFamily: "'Fraunces', serif" }}>Gist Articles</h2>
+          <p className="text-sm text-zinc-500 mt-1">Write and manage entertainment news</p>
+        </div>
+        <button onClick={() => setOpen(!open)} className="flex items-center gap-2 bg-amber-500 hover:bg-amber-400 text-zinc-950 text-sm font-semibold px-4 py-2.5 rounded-lg transition-colors">
+          <Plus size={16} /> New article
+        </button>
+      </div>
+
+      {open && (
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 mb-6">
+          <div className="flex gap-4 mb-4">
+            <div className="shrink-0">
+              <label className="text-xs text-zinc-500 mb-1.5 block">Cover image</label>
+              <label className="w-24 h-24 rounded-lg border border-dashed border-zinc-800 bg-zinc-950 flex items-center justify-center cursor-pointer overflow-hidden hover:border-zinc-700 transition-colors">
+                {coverPreview ? (
+                  <img src={coverPreview} alt="Cover preview" className="w-full h-full object-cover" />
+                ) : (
+                  <Upload size={18} className="text-zinc-600" />
+                )}
+                <input type="file" accept="image/*" onChange={handleCoverSelect} className="hidden" />
+              </label>
+            </div>
+            <div className="flex-1 grid grid-cols-3 gap-4">
+              <div className="col-span-2">
+                <label className="text-xs text-zinc-500 mb-1.5 block">Headline</label>
+                <input value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Behind the scenes at..." className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50" />
+              </div>
+              <div>
+                <label className="text-xs text-zinc-500 mb-1.5 block">Category</label>
+                <select value={category} onChange={e => setCategory(e.target.value)} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50">
+                  <option>Concert</option>
+                  <option>Rumor</option>
+                  <option>Community</option>
+                  <option>Release</option>
+                </select>
+              </div>
+              <div className="col-span-3">
+                <label className="text-xs text-zinc-500 mb-1.5 block">Article body</label>
+                <textarea value={body} onChange={e => setBody(e.target.value)} placeholder="Write the full story here..." rows={5} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50 resize-none" />
+              </div>
+            </div>
+          </div>
+          {error && (
+            <div className="mb-4 text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-lg px-3 py-2">{error}</div>
+          )}
+          <button onClick={publish} disabled={submitting} className="bg-amber-500 hover:bg-amber-400 disabled:opacity-60 text-zinc-950 text-sm font-semibold px-4 py-2.5 rounded-lg transition-colors flex items-center gap-2">
+            {submitting && <Loader2 size={14} className="animate-spin" />}
+            {submitting ? "Saving..." : "Save as draft"}
+          </button>
+        </div>
+      )}
+
+      {gist.length === 0 ? (
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-10 text-center text-sm text-zinc-500">
+          No gist articles yet — tap "New article" to write your first one.
+        </div>
+      ) : (
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-zinc-800 text-left text-zinc-500 text-xs font-mono uppercase tracking-wider">
+                <th className="px-5 py-3 font-medium">Headline</th>
+                <th className="px-5 py-3 font-medium">Category</th>
+                <th className="px-5 py-3 font-medium">Status</th>
+                <th className="px-5 py-3 font-medium">Reads</th>
+                <th className="px-5 py-3 font-medium"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {gist.map(g => (
+                <tr key={g.id} className="border-b border-zinc-800/60 last:border-0 hover:bg-zinc-800/30">
+                  <td className="px-5 py-3.5">
+                    <div className="flex items-center gap-3">
+                      {g.cover_url && (
+                        <div className="w-9 h-9 rounded-md overflow-hidden shrink-0">
+                          <img src={g.cover_url} alt="" className="w-full h-full object-cover" />
+                        </div>
+                      )}
+                      <span className="text-zinc-200 font-medium max-w-xs">{g.title}</span>
+                    </div>
+                  </td>
+                  <td className="px-5 py-3.5 text-zinc-400">{g.category}</td>
+                  <td className="px-5 py-3.5"><StatusPill status={g.status} /></td>
+                  <td className="px-5 py-3.5 text-zinc-400 font-mono text-xs">{formatCount(g.reads)}</td>
+                  <td className="px-5 py-3.5">
+                    <div className="flex items-center gap-1 justify-end">
+                      <button onClick={() => toggleStatus(g.id, g.status)} title="Toggle publish" className="p-1.5 text-zinc-500 hover:text-amber-400 hover:bg-amber-500/10 rounded-md transition-colors"><Edit3 size={14} /></button>
+                      <button onClick={() => remove(g.id)} title="Delete" className="p-1.5 text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-md transition-colors"><Trash2 size={14} /></button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function UsersAndComments({ users, setUsers, comments, setComments, role }) {
+  const [tab, setTab] = useState("users");
+  const isSuperAdmin = role === "super_admin";
+
+  const toggleUserStatus = async (id, currentStatus) => {
+    const newStatus = currentStatus === "Active" ? "Flagged" : "Active";
+    setUsers(users.map(u => u.id === id ? { ...u, status: newStatus } : u));
+    const { error } = await supabase.from("profiles").update({ status: newStatus }).eq("id", id);
+    if (error) setUsers(users.map(u => u.id === id ? { ...u, status: currentStatus } : u));
+  };
+
+  const removeComment = async (id) => {
+    const prev = comments;
+    setComments(comments.filter(c => c.id !== id));
+    const { error } = await supabase.from("comments").delete().eq("id", id);
+    if (error) setComments(prev);
+  };
+
+  const toggleComment = async (id, currentStatus) => {
+    const newStatus = currentStatus === "Visible" ? "Flagged" : "Visible";
+    setComments(comments.map(c => c.id === id ? { ...c, status: newStatus } : c));
+    const { error } = await supabase.from("comments").update({ status: newStatus }).eq("id", id);
+    if (error) setComments(comments.map(c => c.id === id ? { ...c, status: currentStatus } : c));
+  };
+
+  return (
+    <div>
+      <h2 className="text-xl font-semibold text-zinc-50 mb-1" style={{ fontFamily: "'Fraunces', serif" }}>Users &amp; Comments</h2>
+      <p className="text-sm text-zinc-500 mb-5">Manage community members and moderate discussion</p>
+
+      <div className="flex gap-1 mb-5 bg-zinc-900 border border-zinc-800 rounded-lg p-1 w-fit">
+        <button onClick={() => setTab("users")} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${tab === "users" ? "bg-amber-500/10 text-amber-400" : "text-zinc-500 hover:text-zinc-300"}`}>Users</button>
+        <button onClick={() => setTab("comments")} className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${tab === "comments" ? "bg-amber-500/10 text-amber-400" : "text-zinc-500 hover:text-zinc-300"}`}>Comments</button>
+      </div>
+
+      {tab === "users" ? (
+        users.length === 0 ? (
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-10 text-center text-sm text-zinc-500">
+            No registered users yet.
+          </div>
+        ) : (
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-zinc-800 text-left text-zinc-500 text-xs font-mono uppercase tracking-wider">
+                <th className="px-5 py-3 font-medium">Email</th>
+                <th className="px-5 py-3 font-medium">Role</th>
+                <th className="px-5 py-3 font-medium">Joined</th>
+                <th className="px-5 py-3 font-medium">Status</th>
+                <th className="px-5 py-3 font-medium"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.map(u => (
+                <tr key={u.id} className="border-b border-zinc-800/60 last:border-0 hover:bg-zinc-800/30">
+                  <td className="px-5 py-3.5 text-zinc-200 font-medium">{u.email}</td>
+                  <td className="px-5 py-3.5 text-zinc-400">{u.role}</td>
+                  <td className="px-5 py-3.5 text-zinc-500 font-mono text-xs">{u.created_at ? u.created_at.slice(0, 10) : ""}</td>
+                  <td className="px-5 py-3.5"><StatusPill status={u.status === "active" ? "Active" : "Flagged"} /></td>
+                  <td className="px-5 py-3.5">
+                    {isSuperAdmin ? (
+                      <button onClick={() => toggleUserStatus(u.id, u.status === "active" ? "Active" : "Flagged")} className="text-xs text-zinc-500 hover:text-amber-400 transition-colors">
+                        {u.status === "active" ? "Flag" : "Unflag"}
+                      </button>
+                    ) : (
+                      <span className="text-xs text-zinc-700">—</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        )
+      ) : (
+        comments.length === 0 ? (
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-10 text-center text-sm text-zinc-500">
+            No comments yet.
+          </div>
+        ) : (
+        <div className="space-y-3">
+          {comments.map(c => (
+            <div key={c.id} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 flex items-start justify-between gap-4">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className="text-sm font-medium text-zinc-200">{c.user_email || "User"}</span>
+                  <StatusPill status={c.status} />
+                </div>
+                <p className="text-sm text-zinc-400">{c.text}</p>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                <button onClick={() => toggleComment(c.id, c.status)} className="p-1.5 text-zinc-500 hover:text-amber-400 hover:bg-amber-500/10 rounded-md transition-colors" title="Toggle visibility">
+                  {c.status === "Visible" ? <X size={14} /> : <Check size={14} />}
+                </button>
+                {isSuperAdmin && (
+                  <button onClick={() => removeComment(c.id)} className="p-1.5 text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-md transition-colors" title="Delete">
+                    <Trash2 size={14} />
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+        )
+      )}
+    </div>
+  );
+}
+
+// ---------- Login screen ----------
+function LoginScreen({ onLogin }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setError("");
+    if (!email.trim() || !password.trim()) {
+      setError("Enter both email and password.");
+      return;
+    }
+    setLoading(true);
+
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    });
+
+    if (authError) {
+      setError("Incorrect email or password.");
+      setLoading(false);
+      return;
+    }
+
+    // Confirm this account is actually staff (admin or super_admin) before letting them in
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", authData.user.id)
+      .single();
+
+    if (profileError || !profile || (profile.role !== "admin" && profile.role !== "super_admin")) {
+      setError("This account doesn't have admin access.");
+      await supabase.auth.signOut();
+      setLoading(false);
+      return;
+    }
+
+    setLoading(false);
+    onLogin(profile.role, authData.user.email);
+  };
+
+  return (
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex items-center justify-center px-4" style={{ fontFamily: "'Inter', sans-serif" }}>
+      {/* ambient glow */}
+      <div className="pointer-events-none fixed -top-32 left-1/2 -translate-x-1/2 w-[560px] h-[560px] rounded-full opacity-20" style={{ background: "radial-gradient(circle, #D9A441, transparent 70%)" }}></div>
+
+      <div className="relative w-full max-w-sm">
+        <div className="flex flex-col items-center mb-8">
+          <div className="w-11 h-11 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center mb-4">
+            <Lock size={18} className="text-amber-400" />
+          </div>
+          <div className="flex items-baseline gap-0.5 mb-1" style={{ fontFamily: "'Fraunces', serif" }}>
+            <span className="text-xl font-semibold">MyGospelHub</span>
+            <span className="text-amber-400 text-xl">.</span>
+          </div>
+          <div className="text-[11px] font-mono text-zinc-600 uppercase tracking-wider">Admin Console</div>
+        </div>
+
+        <form onSubmit={submit} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+          <div className="mb-4">
+            <label className="text-xs text-zinc-500 mb-1.5 block">Email</label>
+            <div className="relative">
+              <Mail size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600" />
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="admin@mygospelhub.com"
+                autoComplete="username"
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-lg pl-9 pr-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-amber-500/50 transition-colors"
+              />
+            </div>
+          </div>
+
+          <div className="mb-5">
+            <label className="text-xs text-zinc-500 mb-1.5 block">Password</label>
+            <div className="relative">
+              <Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600" />
+              <input
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                autoComplete="current-password"
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-lg pl-9 pr-9 py-2.5 text-sm text-zinc-100 outline-none focus:border-amber-500/50 transition-colors"
+              />
+              <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-600 hover:text-zinc-400">
+                {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+              </button>
+            </div>
+          </div>
+
+   {error && (
+            <div className="mb-4 text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-lg px-3 py-2">
+              {error}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-amber-500 hover:bg-amber-400 disabled:opacity-60 text-zinc-950 text-sm font-semibold py-2.5 rounded-lg transition-colors"
+          >
+            {loading ? "Signing in..." : "Sign in"}
+          </button>
+        </form>
+
+        <p className="text-center text-xs text-zinc-600 mt-6 font-mono">Restricted access · MyGospelHub staff only</p>
+      </div>
+    </div>
+  );
+}
+
+// ---------- App shell ----------
+function Dashboard_Shell({ onLogout, role, userEmail }) {
+  const [page, setPage] = useState("dashboard");
+  const [content, setContent] = useState([]);
+  const [gist, setGist] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [comments, setComments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+
+  const loadAll = async () => {
+    setLoading(true);
+    setLoadError("");
+    const [contentRes, gistRes, usersRes, commentsRes] = await Promise.all([
+      supabase.from("content").select("*").order("created_at", { ascending: false }),
+      supabase.from("gist_articles").select("*").order("created_at", { ascending: false }),
+      supabase.from("profiles").select("*").order("created_at", { ascending: false }),
+      supabase.from("comments").select("*").order("created_at", { ascending: false }),
+    ]);
+
+    const firstError = contentRes.error || gistRes.error || usersRes.error || commentsRes.error;
+    if (firstError) {
+      setLoadError("Couldn't load dashboard data: " + firstError.message);
+      setLoading(false);
+      return;
+    }
+
+    setContent(contentRes.data || []);
+    setGist(gistRes.data || []);
+    setUsers(usersRes.data || []);
+    setComments(commentsRes.data || []);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    loadAll();
+  }, []);
+
+  const flaggedCount = comments.filter(c => c.status === "Flagged").length + users.filter(u => u.status === "Flagged" || u.status === "flagged").length;
+
+  const nav = [
+    { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { key: "content", label: "Songs & Videos", icon: Music2 },
+    { key: "gist", label: "Gist Articles", icon: Newspaper },
+    { key: "users", label: "Users & Comments", icon: Users, badge: flaggedCount || null },
+  ];
+
+  const pageTitle = { dashboard: "Dashboard", content: "Songs & Videos", gist: "Gist Articles", users: "Users & Comments" }[page];
+
+  return (
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex" style={{ fontFamily: "'Inter', sans-serif" }}>
+      {/* Sidebar */}
+      <aside className="w-60 border-r border-zinc-800 flex flex-col shrink-0">
+        <div className="px-5 py-6 border-b border-zinc-800">
+          <div className="flex items-baseline gap-0.5" style={{ fontFamily: "'Fraunces', serif" }}>
+            <span className="text-lg font-semibold">MyGospelHub</span>
+            <span className="text-amber-400 text-lg">.</span>
+          </div>
+          <div className="text-[10px] font-mono text-zinc-600 uppercase tracking-wider mt-0.5">Admin Console</div>
+        </div>
+        <nav className="flex-1 px-3 py-4 space-y-1">
+          {nav.map(item => (
+            <SidebarLink key={item.key} icon={item.icon} label={item.label} active={page === item.key} onClick={() => setPage(item.key)} badge={item.badge} />
+          ))}
+        </nav>
+        <div className="px-4 py-4 border-t border-zinc-800 flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500 to-rose-800 shrink-0"></div>
+          <div className="flex-1 min-w-0">
+            <div className="text-sm text-zinc-200 font-medium truncate">{role === "super_admin" ? "Super Admin" : "Admin"}</div>
+            <div className="text-xs text-zinc-500 truncate">{userEmail}</div>
+          </div>
+          <button onClick={onLogout} title="Sign out" className="p-1.5 text-zinc-600 hover:text-rose-400 hover:bg-rose-500/10 rounded-md transition-colors shrink-0">
+            <LogOut size={15} />
+          </button>
+        </div>
+      </aside>
+
+      {/* Main */}
+      <div className="flex-1 flex flex-col min-w-0">
+        <header className="h-16 border-b border-zinc-800 flex items-center justify-between px-6 shrink-0">
+          <div className="flex items-center gap-2 text-sm text-zinc-500">
+            <span>Admin</span>
+            <span className="text-zinc-700">/</span>
+            <span className="text-zinc-200">{pageTitle}</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600" />
+              <input placeholder="Search..." className="bg-zinc-900 border border-zinc-800 rounded-lg pl-9 pr-3 py-1.5 text-sm text-zinc-200 outline-none focus:border-amber-500/50 w-48" />
+            </div>
+            <button className="relative p-2 text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 rounded-lg transition-colors">
+              <Bell size={16} />
+              {flaggedCount > 0 && <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-rose-500 rounded-full"></span>}
+            </button>
+          </div>
+        </header>
+
+        <main className="flex-1 overflow-y-auto p-6">
+          {loading && <LoadingBlock label="Loading dashboard..." />}
+          {!loading && loadError && <ErrorBlock message={loadError} onRetry={loadAll} />}
+          {!loading && !loadError && (
+            <>
+              {page === "dashboard" && <Dashboard content={content} gist={gist} users={users} comments={comments} />}
+              {page === "content" && <ContentTable content={content} setContent={setContent} />}
+              {page === "gist" && <GistManager gist={gist} setGist={setGist} />}
+              {page === "users" && <UsersAndComments users={users} setUsers={setUsers} comments={comments} setComments={setComments} role={role} />}
+            </>
+          )}
+        </main>
+      </div>
+    </div>
+  );
+}
+
+export default function AdminApp() {
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [role, setRole] = useState(null);
+  const [userEmail, setUserEmail] = useState("");
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setLoggedIn(false);
+    setRole(null);
+    setUserEmail("");
+  };
+
+  if (!loggedIn) {
+    return (
+      <LoginScreen
+        onLogin={(userRole, email) => {
+          setRole(userRole);
+          setUserEmail(email);
+          setLoggedIn(true);
+        }}
+      />
+    );
+  }
+  return <Dashboard_Shell onLogout={handleLogout} role={role} userEmail={userEmail} />;
+}
