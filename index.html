@@ -1,14 +1,1156 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MyGospelHub Admin</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MyGospelHub — Music. Videos. Gist.</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0B0B0D;
+    --bg-raised:#141416;
+    --bg-card:#18181B;
+    --text:#F2EFE9;
+    --text-dim:#8A8780;
+    --gold:#D9A441;
+    --wine:#7A1F2B;
+    --wine-bright:#9C2C3A;
+    --line: rgba(242,239,233,0.08);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    -webkit-font-smoothing:antialiased;
+    overflow-x:hidden;
+    padding-bottom:0;
+  }
+  body.has-player{padding-bottom:76px;}
+  h1,h2,h3,.display{
+    font-family:'Fraunces',serif;
+    font-weight:600;
+    letter-spacing:-0.01em;
+  }
+  .mono{font-family:'JetBrains Mono',monospace;}
+  a{color:inherit;text-decoration:none;}
+  ::selection{background:var(--gold);color:#0B0B0D;}
+  :focus-visible{outline:2px solid var(--gold); outline-offset:3px;}
+  button{font-family:inherit; cursor:pointer;}
+
+  @media (prefers-reduced-motion: reduce){
+    *{animation-duration:0.01ms !important; animation-iteration-count:1 !important; transition-duration:0.01ms !important; scroll-behavior:auto !important;}
+  }
+
+  /* ===== Ticker ===== */
+  .ticker-wrap{
+    background:var(--wine);
+    overflow:hidden;
+    white-space:nowrap;
+    border-bottom:1px solid rgba(0,0,0,0.3);
+    position:relative;
+  }
+  .ticker{
+    display:inline-flex;
+    animation:scrollTicker 28s linear infinite;
+    padding:9px 0;
+  }
+  .ticker span{
+    font-family:'JetBrains Mono',monospace;
+    font-size:12px;
+    letter-spacing:0.06em;
+    color:#F2DCC9;
+    padding:0 28px;
+    display:inline-flex;
+    align-items:center;
+    gap:10px;
+  }
+  .ticker span::before{content:"●"; color:var(--gold); font-size:8px;}
+  @keyframes scrollTicker{
+    0%{transform:translateX(0);}
+    100%{transform:translateX(-50%);}
+  }
+
+  /* ===== Nav ===== */
+  nav{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:22px 5%;
+    position:sticky;
+    top:0;
+    background:rgba(11,11,13,0.85);
+    backdrop-filter:blur(10px);
+    z-index:100;
+    border-bottom:1px solid var(--line);
+  }
+  .logo{
+    font-family:'Fraunces',serif;
+    font-size:22px;
+    font-weight:700;
+    display:flex;
+    align-items:baseline;
+    gap:2px;
+  }
+  .logo .dot{color:var(--gold);}
+  .nav-links{display:flex; gap:36px; font-size:14px; font-weight:500;}
+  .nav-links a{color:var(--text-dim); transition:color 0.2s;}
+  .nav-links a:hover, .nav-links a.active{color:var(--text);}
+
+  /* ===== Search ===== */
+  .nav-search{
+    display:flex;
+    align-items:center;
+    gap:9px;
+    background:var(--bg-raised);
+    border:1px solid var(--line);
+    border-radius:100px;
+    padding:9px 16px;
+    flex:1;
+    max-width:320px;
+    margin:0 24px;
+    transition:border-color 0.2s;
+  }
+  .nav-search:focus-within{border-color:var(--gold);}
+  .nav-search svg{flex-shrink:0; color:var(--text-dim);}
+  .nav-search input{
+    background:none;
+    border:none;
+    outline:none;
+    color:var(--text);
+    font-size:13.5px;
+    font-family:'Inter',sans-serif;
+    width:100%;
+  }
+  .nav-search input::placeholder{color:var(--text-dim);}
+  .search-results{
+    position:absolute;
+    top:calc(100% + 8px);
+    left:0; right:0;
+    background:var(--bg-card);
+    border:1px solid var(--line);
+    border-radius:12px;
+    max-height:360px;
+    overflow-y:auto;
+    display:none;
+    box-shadow:0 12px 32px rgba(0,0,0,0.4);
+    z-index:50;
+  }
+  .search-results.show{display:block;}
+  .search-result-row{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    padding:11px 14px;
+    border-bottom:1px solid var(--line);
+    cursor:pointer;
+    transition:background 0.15s;
+  }
+  .search-result-row:last-child{border-bottom:none;}
+  .search-result-row:hover{background:var(--bg-raised);}
+  .search-result-thumb{
+    width:36px;height:36px;border-radius:6px;
+    background:linear-gradient(135deg, var(--wine-bright), #2A0810);
+    background-size:cover; background-position:center;
+    flex-shrink:0;
+  }
+  .search-result-title{font-size:13.5px; font-weight:600;}
+  .search-result-meta{font-size:11.5px; color:var(--text-dim);}
+  .search-empty{padding:16px 14px; font-size:13px; color:var(--text-dim); text-align:center;}
+  .nav-search-wrap{position:relative; flex:1; display:flex; margin:0 24px; max-width:320px;}
+  .nav-search-wrap .nav-search{margin:0; max-width:none;}
+
+  /* ===== Track action buttons ===== */
+  .track-actions{display:flex; align-items:center; gap:6px;}
+  .track-action-btn{
+    width:32px; height:32px;
+    border-radius:50%;
+    border:1px solid var(--line);
+    background:var(--bg-raised);
+    display:flex; align-items:center; justify-content:center;
+    color:var(--text-dim);
+    transition:all 0.2s;
+    flex-shrink:0;
+  }
+  .track-action-btn:hover{border-color:var(--gold); color:var(--gold); background:rgba(217,164,65,0.08);}
+  .track-action-btn svg{width:14px; height:14px;}
+  .btn{
+    padding:10px 20px;
+    border-radius:100px;
+    font-size:13px;
+    font-weight:600;
+    border:1px solid var(--line);
+    background:transparent;
+    color:var(--text);
+    transition:all 0.2s;
+    font-family:'Inter',sans-serif;
+  }
+  .btn-gold{
+    background:var(--gold);
+    color:#0B0B0D;
+    border:1px solid var(--gold);
+  }
+  .btn-gold:hover{background:#E5B45C;}
+  .btn:not(.btn-gold):hover{border-color:var(--text-dim); background:var(--bg-raised);}
+  .btn:disabled{opacity:0.5; cursor:not-allowed;}
+  .nav-toggle{display:none; background:none; border:none; color:var(--text); font-size:22px;}
+
+  /* ===== Hero ===== */
+  .hero{
+    padding:90px 5% 60px;
+    display:grid;
+    grid-template-columns:1.1fr 0.9fr;
+    gap:60px;
+    align-items:center;
+    max-width:1400px;
+    margin:0 auto;
+  }
+  .eyebrow{
+    font-family:'JetBrains Mono',monospace;
+    font-size:12px;
+    letter-spacing:0.12em;
+    text-transform:uppercase;
+    color:var(--gold);
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-bottom:22px;
+  }
+  .eyebrow .rec{
+    width:8px;height:8px;border-radius:50%;background:var(--wine-bright);
+    animation:pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.3;}}
+  .hero h1{
+    font-size:clamp(40px,5.2vw,72px);
+    line-height:1.04;
+    margin-bottom:24px;
+  }
+  .hero h1 em{font-style:italic; color:var(--gold); font-weight:500;}
+  .hero p{
+    font-size:17px;
+    color:var(--text-dim);
+    max-width:480px;
+    line-height:1.65;
+    margin-bottom:34px;
+  }
+  .hero-cta{display:flex; gap:14px;}
+  .btn-lg{padding:15px 28px; font-size:14px;}
+
+  .hero-visual{
+    position:relative;
+    aspect-ratio:4/5;
+    border-radius:18px;
+    overflow:hidden;
+    background:linear-gradient(160deg, var(--wine) 0%, #3A0E15 55%, #0B0B0D 100%);
+    border:1px solid var(--line);
+  }
+  .hero-visual img.hero-cover{
+    position:absolute; inset:0;
+    width:100%; height:100%;
+    object-fit:cover;
+    opacity:0.4;
+  }
+  .hero-visual::before{
+    content:"";
+    position:absolute; inset:0;
+    background-image:
+      repeating-linear-gradient(90deg, rgba(217,164,65,0.06) 0px, rgba(217,164,65,0.06) 1px, transparent 1px, transparent 40px);
+  }
+  .now-playing-card{
+    position:absolute; bottom:24px; left:24px; right:24px;
+    background:rgba(11,11,13,0.7);
+    backdrop-filter:blur(8px);
+    border-radius:12px;
+    padding:14px 16px;
+    display:flex;
+    align-items:center;
+    gap:12px;
+    border:1px solid rgba(242,239,233,0.1);
+    cursor:pointer;
+  }
+  .np-thumb{
+    width:40px;height:40px;border-radius:8px;
+    background:linear-gradient(135deg,var(--gold),#B87A2E);
+    flex-shrink:0;
+    background-size:cover;
+    background-position:center;
+  }
+  .np-info .title{font-size:13px; font-weight:600;}
+  .np-info .artist{font-size:11px; color:var(--text-dim);}
+  .hero-empty{
+    position:absolute; inset:0;
+    display:flex; align-items:center; justify-content:center;
+    color:var(--text-dim); font-family:'JetBrains Mono',monospace; font-size:13px;
+  }
+
+  /* ===== Section shared ===== */
+  section{padding:70px 5%; max-width:1400px; margin:0 auto;}
+  .section-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    margin-bottom:36px;
+    border-bottom:1px solid var(--line);
+    padding-bottom:20px;
+  }
+  .section-head .label{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;
+    color:var(--text-dim);
+    letter-spacing:0.1em;
+    text-transform:uppercase;
+    margin-bottom:6px;
+  }
+  .section-head h2{font-size:30px;}
+  .empty-state{
+    padding:50px 20px;
+    text-align:center;
+    color:var(--text-dim);
+    font-size:14px;
+    border:1px dashed var(--line);
+    border-radius:14px;
+  }
+  .loading-state{
+    padding:50px 20px;
+    text-align:center;
+    color:var(--text-dim);
+    font-size:13px;
+    font-family:'JetBrains Mono',monospace;
+  }
+
+  /* ===== Setlist (video rows) ===== */
+  .setlist{display:flex; flex-direction:column;}
+  .track-row{
+    display:grid;
+    grid-template-columns:44px 64px 1fr auto auto auto;
+    align-items:center;
+    gap:16px;
+    padding:16px 12px;
+    border-bottom:1px solid var(--line);
+    border-radius:10px;
+    transition:background 0.2s;
+    cursor:pointer;
+  }
+  .track-row.disabled{cursor:default; opacity:0.55;}
+  .track-row:not(.disabled):hover{background:var(--bg-card);}
+  .track-num{font-family:'JetBrains Mono',monospace; color:var(--text-dim); font-size:14px;}
+  .track-row:not(.disabled):hover .track-num{color:var(--gold);}
+  .track-num.playing{color:var(--gold);}
+  .track-thumb{
+    width:64px;height:64px;border-radius:8px;
+    background:linear-gradient(135deg, var(--wine-bright), #2A0810);
+    background-size:cover;
+    background-position:center;
+    position:relative;
+    flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .track-thumb::after{
+    content:"▶";
+    font-size:11px;
+    color:var(--gold);
+  }
+  .track-title{font-size:16px; font-weight:600; margin-bottom:4px;}
+  .track-meta{font-size:12.5px; color:var(--text-dim);}
+  .track-tag{
+    font-family:'JetBrains Mono',monospace;
+    font-size:10px;
+    letter-spacing:0.05em;
+    padding:5px 10px;
+    border-radius:100px;
+    background:var(--bg-raised);
+    color:var(--gold);
+    border:1px solid var(--line);
+    text-transform:uppercase;
+    white-space:nowrap;
+  }
+  .track-dur{font-family:'JetBrains Mono',monospace; font-size:13px; color:var(--text-dim);}
+
+  /* ===== Gist grid ===== */
+  .gist-grid{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:24px;
+  }
+  .gist-card{
+    background:var(--bg-card);
+    border-radius:14px;
+    border:1px solid var(--line);
+    overflow:hidden;
+    transition:transform 0.25s, border-color 0.25s;
+  }
+  .gist-card:hover{transform:translateY(-4px); border-color:rgba(217,164,65,0.3);}
+  .gist-cover{
+    height:150px;
+    background:linear-gradient(135deg, #262629, #17171a);
+    background-size:cover;
+    background-position:center;
+    position:relative;
+  }
+  .gist-cover .cat{
+    position:absolute; top:14px; left:14px;
+    font-family:'JetBrains Mono',monospace;
+    font-size:10px;
+    background:var(--wine);
+    color:#F2DCC9;
+    padding:5px 10px;
+    border-radius:100px;
+    letter-spacing:0.05em;
+    text-transform:uppercase;
+  }
+  .gist-body{padding:20px;}
+  .gist-body h3{font-size:17px; line-height:1.35; margin-bottom:10px; font-weight:600;}
+  .gist-body p{font-size:13.5px; color:var(--text-dim); line-height:1.55; margin-bottom:14px; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;}
+  .gist-meta{font-size:11.5px; color:var(--text-dim); font-family:'JetBrains Mono',monospace; display:flex; justify-content:space-between;}
+
+  /* ===== Genre strip ===== */
+  .genre-strip{display:flex; gap:14px; flex-wrap:wrap;}
+  .genre-pill{
+    padding:12px 22px;
+    border-radius:100px;
+    border:1px solid var(--line);
+    font-size:13.5px;
+    font-weight:500;
+    color:var(--text-dim);
+    transition:all 0.2s;
+    background:transparent;
+  }
+  .genre-pill:hover, .genre-pill.active{
+    border-color:var(--gold);
+    color:var(--gold);
+    background:rgba(217,164,65,0.08);
+  }
+
+  /* ===== Community CTA ===== */
+  .community-cta{
+    background:linear-gradient(120deg, var(--wine) 0%, #38101A 100%);
+    border-radius:20px;
+    padding:64px 5%;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:40px;
+    position:relative;
+    overflow:hidden;
+  }
+  .community-cta::before{
+    content:"";
+    position:absolute; right:-60px; top:-60px;
+    width:280px; height:280px;
+    border-radius:50%;
+    background:radial-gradient(circle, rgba(217,164,65,0.18), transparent 70%);
+  }
+  .community-cta h2{font-size:32px; margin-bottom:12px; max-width:480px;}
+  .community-cta p{color:#EBD4C4; font-size:15px; max-width:420px; line-height:1.6;}
+  .community-cta .btn-gold{padding:16px 30px; font-size:14.5px; white-space:nowrap;}
+
+  /* ===== Footer ===== */
+  footer{
+    border-top:1px solid var(--line);
+    padding:50px 5% 30px;
+    max-width:1400px;
+    margin:0 auto;
+  }
+  .footer-grid{
+    display:grid;
+    grid-template-columns:1.4fr 1fr 1fr 1fr;
+    gap:40px;
+    margin-bottom:40px;
+  }
+  .footer-grid h4{font-size:13px; margin-bottom:16px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.06em; font-family:'JetBrains Mono',monospace; font-weight:500;}
+  .footer-grid a{display:block; font-size:14px; color:var(--text-dim); margin-bottom:10px; transition:color 0.2s;}
+  .footer-grid a:hover{color:var(--gold);}
+  .footer-bottom{
+    display:flex; justify-content:space-between; align-items:center;
+    padding-top:26px; border-top:1px solid var(--line);
+    font-size:12.5px; color:var(--text-dim);
+  }
+  .footer-admin-link{color:var(--text-dim); font-size:12px; opacity:0.6; transition:opacity 0.2s;}
+  .footer-admin-link:hover{opacity:1; color:var(--gold);}
+
+  /* ===== Now Playing bar ===== */
+  .player-bar{
+    position:fixed;
+    bottom:0; left:0; right:0;
+    background:rgba(20,20,22,0.97);
+    backdrop-filter:blur(10px);
+    border-top:1px solid var(--line);
+    padding:12px 5%;
+    display:none;
+    align-items:center;
+    gap:16px;
+    z-index:200;
+  }
+  .player-bar.show{display:flex;}
+  .player-thumb{
+    width:44px;height:44px;border-radius:8px;
+    background:linear-gradient(135deg, var(--wine-bright), #2A0810);
+    background-size:cover;
+    background-position:center;
+    flex-shrink:0;
+  }
+  .player-info{min-width:0; width:200px; flex-shrink:0;}
+  .player-info .title{font-size:13.5px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .player-info .artist{font-size:11.5px; color:var(--text-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .player-playbtn{
+    width:36px;height:36px;border-radius:50%;
+    background:var(--gold);
+    border:none;
+    display:flex; align-items:center; justify-content:center;
+    flex-shrink:0;
+    font-size:13px;
+    color:#0B0B0D;
+  }
+  .player-playbtn:hover{background:#E5B45C;}
+  .player-progress{
+    flex:1;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    min-width:0;
+  }
+  .player-time{font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--text-dim); width:38px; flex-shrink:0;}
+  .player-time.end{text-align:left;}
+  .player-time.start{text-align:right;}
+  .player-seek{
+    flex:1;
+    accent-color:var(--gold);
+    cursor:pointer;
+  }
+  .player-close{
+    background:none; border:none; color:var(--text-dim); font-size:16px; flex-shrink:0;
+  }
+  .player-close:hover{color:var(--text);}
+
+  /* ===== Responsive ===== */
+  @media (max-width:900px){
+    .nav-links{display:none;}
+    .nav-toggle{display:block;}
+    .nav-search-wrap{margin:0 12px;}
+    .hero{grid-template-columns:1fr; padding-top:50px;}
+    .hero-visual{order:-1; aspect-ratio:16/10;}
+    .gist-grid{grid-template-columns:1fr 1fr;}
+    .footer-grid{grid-template-columns:1fr 1fr;}
+    .community-cta{flex-direction:column; text-align:center; align-items:center;}
+    .player-progress{display:none;}
+  }
+  @media (max-width:600px){
+    .gist-grid{grid-template-columns:1fr;}
+    .footer-grid{grid-template-columns:1fr;}
+    .track-row{grid-template-columns:26px 44px 1fr auto; row-gap:8px;}
+    .track-tag, .track-dur{display:none;}
+    .track-actions{grid-column:1/-1; justify-content:flex-end; margin-top:2px;}
+    .section-head{flex-direction:column; align-items:flex-start; gap:10px;}
+    .player-info{width:auto; flex:1;}
+    .nav-search-wrap{display:none;}
+  }
+</style>
+</head>
+<body>
+
+  <div class="ticker-wrap">
+    <div class="ticker" id="ticker">
+      <span>Loading MyGospelHub…</span>
+    </div>
+  </div>
+
+  <nav>
+    <div class="logo">MyGospelHub<span class="dot">.</span></div>
+    <div class="nav-links">
+      <a href="#" class="active">Home</a>
+      <a href="#videos">Videos</a>
+      <a href="#gist">Gist</a>
+      <a href="#genres">Genres</a>
+    </div>
+    <div class="nav-search-wrap">
+      <div class="nav-search">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <input type="text" id="searchInput" placeholder="Search songs, videos, gist…" autocomplete="off">
+      </div>
+      <div class="search-results" id="searchResults"></div>
+    </div>
+    <button class="btn btn-gold" id="heroPlayBtn" disabled>Start Watching</button>
+    <button class="nav-toggle" aria-label="Open menu">☰</button>
+  </nav>
+
+  <div class="hero">
+    <div>
+      <div class="eyebrow"><span class="rec"></span> LIVE ON MYGOSPELHUB NOW</div>
+      <h1>Where the <em>music</em> testifies<br>and the <em>gist</em> spreads.</h1>
+      <p>Watch new gospel videos, stream worship sessions, and catch the latest gist from the gospel scene — all in one place, updated by the community every day.</p>
+      <div class="hero-cta">
+        <button class="btn btn-gold btn-lg" id="heroPlayBtn2" disabled>Start Watching</button>
+        <a href="#gist" class="btn btn-lg">Browse Gist</a>
+      </div>
+    </div>
+    <div class="hero-visual" id="heroVisual">
+      <div class="hero-empty" id="heroEmpty">No content live yet</div>
+    </div>
+  </div>
+
+  <section id="videos">
+    <div class="section-head">
+      <div>
+        <div class="label">This week's setlist</div>
+        <h2>Trending Videos</h2>
+      </div>
+    </div>
+    <div class="setlist" id="setlist">
+      <div class="loading-state">Loading…</div>
+    </div>
+  </section>
+
+  <section id="gist">
+    <div class="section-head">
+      <div>
+        <div class="label">Fresh off the grapevine</div>
+        <h2>Gist &amp; Entertainment</h2>
+      </div>
+    </div>
+    <div class="gist-grid" id="gistGrid">
+      <div class="loading-state">Loading…</div>
+    </div>
+  </section>
+
+  <section id="genres">
+    <div class="section-head">
+      <div>
+        <div class="label">Find your sound</div>
+        <h2>Browse by Genre</h2>
+      </div>
+    </div>
+    <div class="genre-strip" id="genreStrip">
+      <button class="genre-pill active" data-genre="All">All</button>
+    </div>
+    <div class="setlist" id="genreResults" style="margin-top:28px;"></div>
+  </section>
+
+  <section>
+    <div class="community-cta">
+      <div>
+        <h2>New videos and gist, every day.</h2>
+        <p>MyGospelHub is updated daily with fresh worship sessions, covers, and the stories behind the music.</p>
+      </div>
+      <button class="btn btn-gold" id="ctaPlayBtn" disabled>Start Watching</button>
+    </div>
+  </section>
+
+  <footer>
+    <div class="footer-grid">
+      <div>
+        <div class="logo" style="margin-bottom:14px;">MyGospelHub<span class="dot">.</span></div>
+        <p style="color:var(--text-dim); font-size:13.5px; line-height:1.6; max-width:260px;">The home for gospel music videos, worship sessions, and the gist that connects the community.</p>
+      </div>
+      <div>
+        <h4>Explore</h4>
+        <a href="#videos">Videos</a>
+        <a href="#gist">Gist</a>
+        <a href="#genres">Genres</a>
+      </div>
+      <div>
+        <h4>Community</h4>
+        <a href="#">Submit a Video</a>
+        <a href="#">Guidelines</a>
+        <a href="#">Support</a>
+      </div>
+      <div>
+        <h4>Company</h4>
+        <a href="#">About</a>
+        <a href="#">Contact</a>
+        <a href="#">Privacy</a>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 MyGospelHub. All rights reserved.</span>
+      <a href="/admin/" class="footer-admin-link mono">ADMIN</a>
+    </div>
+  </footer>
+
+  <!-- Now playing bar -->
+  <div class="player-bar" id="playerBar">
+    <div class="player-thumb" id="playerThumb"></div>
+    <div class="player-info">
+      <div class="title" id="playerTitle">—</div>
+      <div class="artist" id="playerArtist">—</div>
+    </div>
+    <button class="player-playbtn" id="playerToggle">▶</button>
+    <div class="player-progress">
+      <span class="player-time start" id="playerTime">0:00</span>
+      <input type="range" class="player-seek" id="playerSeek" value="0" min="0" max="100" />
+      <span class="player-time end" id="playerDuration">0:00</span>
+    </div>
+    <button class="player-close" id="playerClose" aria-label="Close player">✕</button>
+  </div>
+
+  <audio id="mediaAudio" style="display:none;"></audio>
+  <video id="mediaVideo" style="display:none;"></video>
+
+<script>
+  // ==================================================================
+  // Supabase connection — same project the admin console writes to.
+  // Only reads happen here; the anon key is safe to expose in frontend
+  // code as long as Row Level Security policies are set correctly.
+  // ==================================================================
+  const SUPABASE_URL = "https://kqgnpryubgdtmtcjtasi.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtxZ25wcnl1YmdkdG10Y2p0YXNpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQxNTQ1NjQsImV4cCI6MjA5OTczMDU2NH0.T0y1CVCzIvfmK4vgczmlpiAFZP63MRLZT5eymu8R6jY";
+
+  async function supabaseQuery(table, params) {
+    const url = `${SUPABASE_URL}/rest/v1/${table}?${params}`;
+    const res = await fetch(url, {
+      headers: {
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      },
+    });
+    if (!res.ok) throw new Error(`Failed to load ${table}`);
+    return res.json();
+  }
+
+  function formatCount(n) {
+    if (n == null) return "0";
+    if (n >= 1000000) return (n / 1000000).toFixed(1).replace(/\.0$/, "") + "M";
+    if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, "") + "K";
+    return String(n);
+  }
+
+  function timeAgo(dateString) {
+    if (!dateString) return "";
+    const diff = Date.now() - new Date(dateString).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return "JUST NOW";
+    if (mins < 60) return `${mins}M AGO`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}H AGO`;
+    const days = Math.floor(hrs / 24);
+    return `${days}D AGO`;
+  }
+
+  function formatDuration(seconds) {
+    if (!seconds || isNaN(seconds)) return "0:00";
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m}:${String(s).padStart(2, "0")}`;
+  }
+
+  function escapeHtml(str) {
+    if (!str) return "";
+    return str.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  const ICON_DOWNLOAD = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`;
+  const ICON_SHARE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>`;
+
+  function downloadTrack(track) {
+    const src = track.file_url;
+    if (!src) return;
+    const a = document.createElement("a");
+    a.href = src;
+    a.download = track.title || "download";
+    a.target = "_blank";
+    a.rel = "noopener";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
+
+  async function shareTrack(track) {
+    const url = `${window.location.origin}${window.location.pathname}#track-${track.id}`;
+    const shareData = {
+      title: track.title,
+      text: `Listen to "${track.title}" by ${track.artist || "MyGospelHub"} on MyGospelHub`,
+      url,
+    };
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData);
+        return;
+      } catch (err) {
+        // user cancelled the share sheet — do nothing further
+        if (err.name === "AbortError") return;
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      alert("Link copied to clipboard.");
+    } catch (err) {
+      prompt("Copy this link:", url);
+    }
+  }
+
+  // ==================================================================
+  // State
+  // ==================================================================
+  let allContent = [];
+  let allGist = [];
+  let currentTrack = null;
+  let isPlaying = false;
+
+  const audioEl = document.getElementById("mediaAudio");
+  const videoEl = document.getElementById("mediaVideo");
+
+  function isAudioTrack(track) {
+    if (track.type === "Audio") return true;
+    if (track.type === "Video") return false;
+    const src = track.file_url || "";
+    return !/\.(mp4|mov|webm|m4v)(\?|$)/i.test(src);
+  }
+
+  function activeMediaEl() {
+    return currentTrack && !isAudioTrack(currentTrack) ? videoEl : audioEl;
+  }
+
+  // ==================================================================
+  // Player controls
+  // ==================================================================
+  function playTrack(track) {
+    const src = track.file_url || track.streaming_link || track.video_url;
+    if (!src) return;
+
+    if (currentTrack && currentTrack.id === track.id) {
+      togglePlay();
+      return;
+    }
+
+    // stop whichever element was previously playing
+    audioEl.pause();
+    videoEl.pause();
+
+    currentTrack = track;
+    const el = activeMediaEl();
+    el.src = src;
+    el.currentTime = 0;
+    el.play().then(() => {
+      isPlaying = true;
+      updatePlayerUI();
+    }).catch(() => {
+      isPlaying = false;
+      updatePlayerUI();
+    });
+
+    document.body.classList.add("has-player");
+    document.getElementById("playerBar").classList.add("show");
+    renderTrackLists();
+  }
+
+  function togglePlay() {
+    const el = activeMediaEl();
+    if (!el.src) return;
+    if (isPlaying) {
+      el.pause();
+      isPlaying = false;
+    } else {
+      el.play();
+      isPlaying = true;
+    }
+    updatePlayerUI();
+  }
+
+  function closePlayer() {
+    audioEl.pause();
+    videoEl.pause();
+    audioEl.src = "";
+    videoEl.src = "";
+    currentTrack = null;
+    isPlaying = false;
+    document.body.classList.remove("has-player");
+    document.getElementById("playerBar").classList.remove("show");
+    renderTrackLists();
+  }
+
+  function updatePlayerUI() {
+    const toggleBtn = document.getElementById("playerToggle");
+    toggleBtn.textContent = isPlaying ? "❚❚" : "▶";
+    if (!currentTrack) return;
+    document.getElementById("playerTitle").textContent = currentTrack.title;
+    document.getElementById("playerArtist").textContent = currentTrack.artist || "";
+    const thumb = document.getElementById("playerThumb");
+    thumb.style.backgroundImage = currentTrack.cover_url ? `url(${currentTrack.cover_url})` : "none";
+  }
+
+  [audioEl, videoEl].forEach(el => {
+    el.addEventListener("timeupdate", () => {
+      if (activeMediaEl() !== el) return;
+      const seek = document.getElementById("playerSeek");
+      seek.max = el.duration || 0;
+      seek.value = el.currentTime || 0;
+      document.getElementById("playerTime").textContent = formatDuration(el.currentTime);
+      document.getElementById("playerDuration").textContent = formatDuration(el.duration);
+    });
+    el.addEventListener("ended", () => {
+      if (activeMediaEl() !== el) return;
+      isPlaying = false;
+      updatePlayerUI();
+    });
+  });
+
+  document.getElementById("playerToggle").addEventListener("click", togglePlay);
+  document.getElementById("playerClose").addEventListener("click", closePlayer);
+  document.getElementById("playerSeek").addEventListener("input", (e) => {
+    const el = activeMediaEl();
+    el.currentTime = Number(e.target.value);
+  });
+
+  [
+    "heroPlayBtn", "heroPlayBtn2", "ctaPlayBtn"
+  ].forEach(id => {
+    document.getElementById(id).addEventListener("click", () => {
+      if (allContent.length > 0) playTrack(allContent[0]);
+    });
+  });
+
+  // ==================================================================
+  // Rendering
+  // ==================================================================
+  function renderTicker() {
+    const ticker = document.getElementById("ticker");
+    if (allContent.length === 0) {
+      ticker.innerHTML = `<span>Welcome to MyGospelHub — new content dropping soon</span>`;
+      return;
+    }
+    const items = allContent.slice(0, 4);
+    const doubled = [...items, ...items];
+    ticker.innerHTML = doubled.map(c =>
+      `<span>NEW: ${escapeHtml(c.title)} — ${escapeHtml(c.artist || "")}</span>`
+    ).join("");
+  }
+
+  function renderHero() {
+    const track = allContent[0];
+    const visual = document.getElementById("heroVisual");
+    const emptyEl = document.getElementById("heroEmpty");
+    ["heroPlayBtn", "heroPlayBtn2", "ctaPlayBtn"].forEach(id => {
+      document.getElementById(id).disabled = !track;
+    });
+    if (!track) {
+      if (emptyEl) emptyEl.style.display = "flex";
+      return;
+    }
+    visual.innerHTML = `
+      ${track.cover_url ? `<img class="hero-cover" src="${escapeHtml(track.cover_url)}" alt="">` : ""}
+      <div class="now-playing-card" id="heroNowPlaying">
+        <div class="np-thumb" style="${track.cover_url ? `background-image:url(${escapeHtml(track.cover_url)})` : ""}"></div>
+        <div class="np-info">
+          <div class="title">${escapeHtml(track.title)}</div>
+          <div class="artist">${escapeHtml(track.artist || "")} · Tap to play</div>
+        </div>
+      </div>
+    `;
+    document.getElementById("heroNowPlaying").addEventListener("click", () => playTrack(track));
+  }
+
+  function trackRowHtml(track, index) {
+    const hasMedia = Boolean(track.file_url || track.streaming_link || track.video_url);
+    const hasDownload = Boolean(track.file_url);
+    const isActive = currentTrack && currentTrack.id === track.id;
+    const num = isActive && isPlaying ? "▶" : String(index + 1).padStart(2, "0");
+    return `
+      <div class="track-row ${hasMedia ? "" : "disabled"}" data-track-id="${track.id}" id="track-${track.id}">
+        <div class="track-num ${isActive ? "playing" : ""}">${num}</div>
+        <div class="track-thumb" style="${track.cover_url ? `background-image:url(${escapeHtml(track.cover_url)})` : ""}"></div>
+        <div>
+          <div class="track-title">${escapeHtml(track.title)}</div>
+          <div class="track-meta">${escapeHtml(track.artist || "")} · ${formatCount(track.views)} views</div>
+        </div>
+        <div class="track-tag">${escapeHtml(track.genre || track.type || "")}</div>
+        <div class="track-actions">
+          ${hasDownload ? `<button class="track-action-btn download-btn" data-track-id="${track.id}" title="Download" aria-label="Download">${ICON_DOWNLOAD}</button>` : ""}
+          <button class="track-action-btn share-btn" data-track-id="${track.id}" title="Share" aria-label="Share">${ICON_SHARE}</button>
+        </div>
+      </div>
+    `;
+  }
+
+  function attachTrackRowHandlers(container) {
+    container.querySelectorAll(".track-row").forEach(row => {
+      row.addEventListener("click", () => {
+        const id = row.dataset.trackId;
+        const track = allContent.find(c => String(c.id) === String(id));
+        if (track && (track.file_url || track.streaming_link || track.video_url)) {
+          playTrack(track);
+        }
+      });
+    });
+    container.querySelectorAll(".download-btn").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const track = allContent.find(c => String(c.id) === String(btn.dataset.trackId));
+        if (track) downloadTrack(track);
+      });
+    });
+    container.querySelectorAll(".share-btn").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const track = allContent.find(c => String(c.id) === String(btn.dataset.trackId));
+        if (track) shareTrack(track);
+      });
+    });
+  }
+
+  function renderTrackLists() {
+    // Trending (top 5 by views)
+    const setlist = document.getElementById("setlist");
+    if (allContent.length === 0) {
+      setlist.innerHTML = `<div class="empty-state">No videos published yet — check back soon.</div>`;
+    } else {
+      const trending = [...allContent].sort((a, b) => (b.views || 0) - (a.views || 0)).slice(0, 5);
+      setlist.innerHTML = trending.map((t, i) => trackRowHtml(t, i)).join("");
+      attachTrackRowHandlers(setlist);
+    }
+
+    // Genre-filtered results
+    const activeGenre = document.querySelector(".genre-pill.active")?.dataset.genre || "All";
+    const genreResults = document.getElementById("genreResults");
+    if (activeGenre === "All") {
+      genreResults.innerHTML = "";
+    } else {
+      const filtered = allContent.filter(c => c.genre === activeGenre);
+      genreResults.innerHTML = filtered.length === 0
+        ? `<div class="empty-state">Nothing in ${escapeHtml(activeGenre)} yet.</div>`
+        : filtered.map((t, i) => trackRowHtml(t, i)).join("");
+      attachTrackRowHandlers(genreResults);
+    }
+  }
+
+  function renderGenres() {
+    const genres = ["All", ...new Set(allContent.map(c => c.genre).filter(Boolean))];
+    const strip = document.getElementById("genreStrip");
+    strip.innerHTML = genres.map(g =>
+      `<button class="genre-pill ${g === "All" ? "active" : ""}" data-genre="${escapeHtml(g)}">${escapeHtml(g)}</button>`
+    ).join("");
+    strip.querySelectorAll(".genre-pill").forEach(pill => {
+      pill.addEventListener("click", () => {
+        strip.querySelectorAll(".genre-pill").forEach(p => p.classList.remove("active"));
+        pill.classList.add("active");
+        renderTrackLists();
+      });
+    });
+  }
+
+  function renderGist() {
+    const grid = document.getElementById("gistGrid");
+    if (allGist.length === 0) {
+      grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1;">No gist posted yet — check back soon.</div>`;
+      return;
+    }
+    grid.innerHTML = allGist.map(post => `
+      <div class="gist-card">
+        <div class="gist-cover" style="${post.cover_url ? `background-image:url(${escapeHtml(post.cover_url)})` : ""}">
+          <span class="cat">${escapeHtml(post.category || "Gist")}</span>
+        </div>
+        <div class="gist-body">
+          <h3>${escapeHtml(post.title)}</h3>
+          <p>${escapeHtml(post.excerpt || post.body || "")}</p>
+          <div class="gist-meta"><span>${timeAgo(post.created_at)}</span><span>${formatCount(post.reads)} reads</span></div>
+        </div>
+      </div>
+    `).join("");
+  }
+
+  // ==================================================================
+  // Load data
+  // ==================================================================
+  async function loadContent() {
+    try {
+      const [contentData, gistData] = await Promise.all([
+        supabaseQuery("content", "status=eq.Published&order=created_at.desc"),
+        supabaseQuery("gist_articles", "status=eq.Published&order=created_at.desc"),
+      ]);
+      allContent = contentData || [];
+      allGist = gistData || [];
+    } catch (err) {
+      console.error(err);
+      document.getElementById("setlist").innerHTML = `<div class="empty-state">Couldn't load MyGospelHub right now. Refresh to try again.</div>`;
+      document.getElementById("gistGrid").innerHTML = `<div class="empty-state" style="grid-column:1/-1;">Couldn't load gist right now.</div>`;
+      return;
+    }
+    renderTicker();
+    renderHero();
+    renderTrackLists();
+    renderGenres();
+    renderGist();
+  }
+
+  // ==================================================================
+  // Search
+  // ==================================================================
+  function searchResultRow(item, kind) {
+    const title = kind === "gist" ? item.title : item.title;
+    const meta = kind === "gist" ? (item.category || "Gist") : (item.artist || item.type || "");
+    const thumbStyle = item.cover_url ? `background-image:url(${escapeHtml(item.cover_url)})` : "";
+    return `
+      <div class="search-result-row" data-kind="${kind}" data-id="${item.id}">
+        <div class="search-result-thumb" style="${thumbStyle}"></div>
+        <div>
+          <div class="search-result-title">${escapeHtml(title)}</div>
+          <div class="search-result-meta">${escapeHtml(meta)}</div>
+        </div>
+      </div>
+    `;
+  }
+
+  function runSearch(query) {
+    const resultsEl = document.getElementById("searchResults");
+    const q = query.trim().toLowerCase();
+    if (!q) {
+      resultsEl.classList.remove("show");
+      resultsEl.innerHTML = "";
+      return;
+    }
+    const contentMatches = allContent.filter(c =>
+      (c.title || "").toLowerCase().includes(q) ||
+      (c.artist || "").toLowerCase().includes(q) ||
+      (c.genre || "").toLowerCase().includes(q)
+    ).slice(0, 6);
+    const gistMatches = allGist.filter(g =>
+      (g.title || "").toLowerCase().includes(q) ||
+      (g.category || "").toLowerCase().includes(q)
+    ).slice(0, 4);
+
+    if (contentMatches.length === 0 && gistMatches.length === 0) {
+      resultsEl.innerHTML = `<div class="search-empty">No results for "${escapeHtml(query)}"</div>`;
+    } else {
+      resultsEl.innerHTML =
+        contentMatches.map(c => searchResultRow(c, "content")).join("") +
+        gistMatches.map(g => searchResultRow(g, "gist")).join("");
+    }
+    resultsEl.classList.add("show");
+
+    resultsEl.querySelectorAll(".search-result-row").forEach(row => {
+      row.addEventListener("click", () => {
+        const id = row.dataset.id;
+        if (row.dataset.kind === "content") {
+          const track = allContent.find(c => String(c.id) === String(id));
+          if (track) {
+            resultsEl.classList.remove("show");
+            document.getElementById("searchInput").value = "";
+            document.getElementById("videos").scrollIntoView({ behavior: "smooth" });
+            if (track.file_url || track.streaming_link || track.video_url) {
+              setTimeout(() => playTrack(track), 400);
+            }
+          }
+        } else {
+          resultsEl.classList.remove("show");
+          document.getElementById("searchInput").value = "";
+          document.getElementById("gist").scrollIntoView({ behavior: "smooth" });
+        }
+      });
+    });
+  }
+
+  const searchInput = document.getElementById("searchInput");
+  searchInput.addEventListener("input", (e) => runSearch(e.target.value));
+  searchInput.addEventListener("focus", (e) => { if (e.target.value.trim()) runSearch(e.target.value); });
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest(".nav-search-wrap")) {
+      document.getElementById("searchResults").classList.remove("show");
+    }
+  });
+
+  loadContent();
+</script>
+
+</body>
 </html>
