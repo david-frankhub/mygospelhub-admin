@@ -162,6 +162,37 @@
   .nav-search-wrap{position:relative; flex:1; display:flex; margin:0 24px; max-width:320px;}
   .nav-search-wrap .nav-search{margin:0; max-width:none;}
 
+  .nav-icon-btn{
+    display:none;
+    width:38px; height:38px;
+    border-radius:50%;
+    border:1px solid var(--line);
+    background:transparent;
+    color:var(--text);
+    align-items:center;
+    justify-content:center;
+    flex-shrink:0;
+    transition:all 0.2s;
+  }
+  .nav-icon-btn:hover{border-color:var(--text-dim); background:var(--bg-raised);}
+
+  .mobile-search-bar{
+    display:none;
+    position:sticky;
+    top:69px;
+    z-index:99;
+    background:rgba(11,11,13,0.97);
+    backdrop-filter:blur(10px);
+    padding:12px 5%;
+    border-bottom:1px solid var(--line);
+  }
+  .mobile-search-bar.show{display:block;}
+  .mobile-search-bar .nav-search{max-width:none;}
+  .mobile-search-close{
+    background:none; border:none; color:var(--text-dim); font-size:16px; flex-shrink:0; margin-left:4px;
+  }
+  .mobile-search-bar .search-results{position:relative; top:8px;}
+
   /* ===== Track action buttons ===== */
   .track-actions{display:flex; align-items:center; gap:6px;}
   .track-action-btn{
@@ -529,7 +560,8 @@
   @media (max-width:900px){
     .nav-links{display:none;}
     .nav-toggle{display:block;}
-    .nav-search-wrap{margin:0 12px;}
+    .nav-search-wrap{display:none;}
+    .nav-icon-btn{display:flex;}
     .hero{grid-template-columns:1fr; padding-top:50px;}
     .hero-visual{order:-1; aspect-ratio:16/10;}
     .gist-grid{grid-template-columns:1fr 1fr;}
@@ -545,7 +577,6 @@
     .track-actions{grid-column:1/-1; justify-content:flex-end; margin-top:2px;}
     .section-head{flex-direction:column; align-items:flex-start; gap:10px;}
     .player-info{width:auto; flex:1;}
-    .nav-search-wrap{display:none;}
   }
 </style>
 </head>
@@ -565,16 +596,28 @@
       <a href="#gist">Gist</a>
       <a href="#genres">Genres</a>
     </div>
-    <div class="nav-search-wrap">
+    <div class="nav-search-wrap" id="navSearchWrap">
       <div class="nav-search">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
         <input type="text" id="searchInput" placeholder="Search songs, videos, gist…" autocomplete="off">
       </div>
       <div class="search-results" id="searchResults"></div>
     </div>
-    <button class="btn btn-gold" id="heroPlayBtn" disabled>Start Watching</button>
+    <button class="nav-icon-btn" id="mobileSearchToggle" aria-label="Search">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+    </button>
     <button class="nav-toggle" aria-label="Open menu">☰</button>
   </nav>
+
+  <!-- Mobile search bar: hidden until the search icon is tapped -->
+  <div class="mobile-search-bar" id="mobileSearchBar">
+    <div class="nav-search">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      <input type="text" id="searchInputMobile" placeholder="Search songs, videos, gist…" autocomplete="off">
+      <button class="mobile-search-close" id="mobileSearchClose" aria-label="Close search">✕</button>
+    </div>
+    <div class="search-results" id="searchResultsMobile"></div>
+  </div>
 
   <div class="hero">
     <div>
@@ -598,7 +641,31 @@
         <h2>Trending Videos</h2>
       </div>
     </div>
-    <div class="setlist" id="setlist">
+    <div class="setlist" id="setlistVideos">
+      <div class="loading-state">Loading…</div>
+    </div>
+  </section>
+
+  <section id="tracks">
+    <div class="section-head">
+      <div>
+        <div class="label">On repeat</div>
+        <h2>Trending Tracks</h2>
+      </div>
+    </div>
+    <div class="setlist" id="setlistTracks">
+      <div class="loading-state">Loading…</div>
+    </div>
+  </section>
+
+  <section id="trending-gist">
+    <div class="section-head">
+      <div>
+        <div class="label">Most read</div>
+        <h2>Trending Gist</h2>
+      </div>
+    </div>
+    <div class="gist-grid" id="trendingGistGrid">
       <div class="loading-state">Loading…</div>
     </div>
   </section>
@@ -637,7 +704,6 @@
       <button class="btn btn-gold" id="ctaPlayBtn" disabled>Start Watching</button>
     </div>
   </section>
-
   <footer>
     <div class="footer-grid">
       <div>
@@ -734,7 +800,6 @@
     const s = Math.floor(seconds % 60);
     return `${m}:${String(s).padStart(2, "0")}`;
   }
-
   function escapeHtml(str) {
     if (!str) return "";
     return str.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -834,7 +899,6 @@
     document.getElementById("playerBar").classList.add("show");
     renderTrackLists();
   }
-
   function togglePlay() {
     const el = activeMediaEl();
     if (!el.src) return;
@@ -894,7 +958,7 @@
   });
 
   [
-    "heroPlayBtn", "heroPlayBtn2", "ctaPlayBtn"
+    "heroPlayBtn2", "ctaPlayBtn"
   ].forEach(id => {
     document.getElementById(id).addEventListener("click", () => {
       if (allContent.length > 0) playTrack(allContent[0]);
@@ -921,7 +985,7 @@
     const track = allContent[0];
     const visual = document.getElementById("heroVisual");
     const emptyEl = document.getElementById("heroEmpty");
-    ["heroPlayBtn", "heroPlayBtn2", "ctaPlayBtn"].forEach(id => {
+    ["heroPlayBtn2", "ctaPlayBtn"].forEach(id => {
       document.getElementById(id).disabled = !track;
     });
     if (!track) {
@@ -990,17 +1054,29 @@
   }
 
   function renderTrackLists() {
-    // Trending (top 5 by views)
-    const setlist = document.getElementById("setlist");
-    if (allContent.length === 0) {
-      setlist.innerHTML = `<div class="empty-state">No videos published yet — check back soon.</div>`;
+    // Trending Videos (top 5 by views, type = Video)
+    const videoList = document.getElementById("setlistVideos");
+    const videos = allContent.filter(c => c.type === "Video");
+    if (videos.length === 0) {
+      videoList.innerHTML = `<div class="empty-state">No videos published yet — check back soon.</div>`;
     } else {
-      const trending = [...allContent].sort((a, b) => (b.views || 0) - (a.views || 0)).slice(0, 5);
-      setlist.innerHTML = trending.map((t, i) => trackRowHtml(t, i)).join("");
-      attachTrackRowHandlers(setlist);
+      const trendingVideos = [...videos].sort((a, b) => (b.views || 0) - (a.views || 0)).slice(0, 5);
+      videoList.innerHTML = trendingVideos.map((t, i) => trackRowHtml(t, i)).join("");
+      attachTrackRowHandlers(videoList);
     }
 
-    // Genre-filtered results
+    // Trending Tracks (top 5 by views, type = Audio)
+    const trackList = document.getElementById("setlistTracks");
+    const tracks = allContent.filter(c => c.type === "Audio");
+    if (tracks.length === 0) {
+      trackList.innerHTML = `<div class="empty-state">No tracks published yet — check back soon.</div>`;
+    } else {
+      const trendingTracks = [...tracks].sort((a, b) => (b.views || 0) - (a.views || 0)).slice(0, 5);
+      trackList.innerHTML = trendingTracks.map((t, i) => trackRowHtml(t, i)).join("");
+      attachTrackRowHandlers(trackList);
+    }
+
+    // Genre-filtered results (searches across both videos and tracks)
     const activeGenre = document.querySelector(".genre-pill.active")?.dataset.genre || "All";
     const genreResults = document.getElementById("genreResults");
     if (activeGenre === "All") {
@@ -1027,15 +1103,10 @@
         renderTrackLists();
       });
     });
-  }
-
-  function renderGist() {
-    const grid = document.getElementById("gistGrid");
-    if (allGist.length === 0) {
-      grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1;">No gist posted yet — check back soon.</div>`;
-      return;
     }
-    grid.innerHTML = allGist.map(post => `
+
+  function gistCardHtml(post) {
+    return `
       <div class="gist-card">
         <div class="gist-cover" style="${post.cover_url ? `background-image:url(${escapeHtml(post.cover_url)})` : ""}">
           <span class="cat">${escapeHtml(post.category || "Gist")}</span>
@@ -1046,7 +1117,26 @@
           <div class="gist-meta"><span>${timeAgo(post.created_at)}</span><span>${formatCount(post.reads)} reads</span></div>
         </div>
       </div>
-    `).join("");
+    `;
+  }
+
+  function renderTrendingGist() {
+    const grid = document.getElementById("trendingGistGrid");
+    if (allGist.length === 0) {
+      grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1;">No gist posted yet — check back soon.</div>`;
+      return;
+    }
+    const trending = [...allGist].sort((a, b) => (b.reads || 0) - (a.reads || 0)).slice(0, 3);
+    grid.innerHTML = trending.map(gistCardHtml).join("");
+  }
+
+  function renderGist() {
+    const grid = document.getElementById("gistGrid");
+    if (allGist.length === 0) {
+      grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1;">No gist posted yet — check back soon.</div>`;
+      return;
+    }
+    grid.innerHTML = allGist.map(gistCardHtml).join("");
   }
 
   // ==================================================================
@@ -1062,14 +1152,19 @@
       allGist = gistData || [];
     } catch (err) {
       console.error(err);
-      document.getElementById("setlist").innerHTML = `<div class="empty-state">Couldn't load MyGospelHub right now. Refresh to try again.</div>`;
-      document.getElementById("gistGrid").innerHTML = `<div class="empty-state" style="grid-column:1/-1;">Couldn't load gist right now.</div>`;
+      const errMsg = `<div class="empty-state">Couldn't load MyGospelHub right now. Refresh to try again.</div>`;
+      const errMsgGrid = `<div class="empty-state" style="grid-column:1/-1;">Couldn't load gist right now.</div>`;
+      document.getElementById("setlistVideos").innerHTML = errMsg;
+      document.getElementById("setlistTracks").innerHTML = errMsg;
+      document.getElementById("trendingGistGrid").innerHTML = errMsgGrid;
+      document.getElementById("gistGrid").innerHTML = errMsgGrid;
       return;
     }
     renderTicker();
     renderHero();
     renderTrackLists();
     renderGenres();
+    renderTrendingGist();
     renderGist();
   }
 
@@ -1091,8 +1186,12 @@
     `;
   }
 
-  function runSearch(query) {
-    const resultsEl = document.getElementById("searchResults");
+  function closeAllSearchResults() {
+    document.getElementById("searchResults").classList.remove("show");
+    document.getElementById("searchResultsMobile").classList.remove("show");
+  }
+
+  function runSearch(query, resultsEl, inputEl) {
     const q = query.trim().toLowerCase();
     if (!q) {
       resultsEl.classList.remove("show");
@@ -1124,28 +1223,49 @@
         if (row.dataset.kind === "content") {
           const track = allContent.find(c => String(c.id) === String(id));
           if (track) {
-            resultsEl.classList.remove("show");
-            document.getElementById("searchInput").value = "";
+            closeAllSearchResults();
+            inputEl.value = "";
+            document.getElementById("mobileSearchBar").classList.remove("show");
             document.getElementById("videos").scrollIntoView({ behavior: "smooth" });
             if (track.file_url || track.streaming_link || track.video_url) {
               setTimeout(() => playTrack(track), 400);
             }
           }
         } else {
-          resultsEl.classList.remove("show");
-          document.getElementById("searchInput").value = "";
+          closeAllSearchResults();
+          inputEl.value = "";
+          document.getElementById("mobileSearchBar").classList.remove("show");
           document.getElementById("gist").scrollIntoView({ behavior: "smooth" });
         }
       });
     });
   }
 
+  // Desktop search
   const searchInput = document.getElementById("searchInput");
-  searchInput.addEventListener("input", (e) => runSearch(e.target.value));
-  searchInput.addEventListener("focus", (e) => { if (e.target.value.trim()) runSearch(e.target.value); });
+  const searchResults = document.getElementById("searchResults");
+  searchInput.addEventListener("input", (e) => runSearch(e.target.value, searchResults, searchInput));
+  searchInput.addEventListener("focus", (e) => { if (e.target.value.trim()) runSearch(e.target.value, searchResults, searchInput); });
+
+  // Mobile search
+  const searchInputMobile = document.getElementById("searchInputMobile");
+  const searchResultsMobile = document.getElementById("searchResultsMobile");
+  const mobileSearchBar = document.getElementById("mobileSearchBar");
+  searchInputMobile.addEventListener("input", (e) => runSearch(e.target.value, searchResultsMobile, searchInputMobile));
+
+  document.getElementById("mobileSearchToggle").addEventListener("click", () => {
+    mobileSearchBar.classList.add("show");
+    searchInputMobile.focus();
+  });
+  document.getElementById("mobileSearchClose").addEventListener("click", () => {
+    mobileSearchBar.classList.remove("show");
+    searchInputMobile.value = "";
+    searchResultsMobile.classList.remove("show");
+  });
+
   document.addEventListener("click", (e) => {
     if (!e.target.closest(".nav-search-wrap")) {
-      document.getElementById("searchResults").classList.remove("show");
+      searchResults.classList.remove("show");
     }
   });
 
