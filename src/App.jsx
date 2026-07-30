@@ -453,7 +453,7 @@ function ContentTable({ content, setContent }) {
             </thead>
             <tbody>
               {content.map(c => (
-              <tr key={c.id} className="border-b border-zinc-800/60 last:border-0 hover:bg-zinc-800/30">
+            <tr key={c.id} className="border-b border-zinc-800/60 last:border-0 hover:bg-zinc-800/30">
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-3">
                       <div className="w-9 h-9 rounded-md bg-gradient-to-br from-rose-800 to-zinc-900 flex items-center justify-center shrink-0 overflow-hidden">
@@ -812,9 +812,8 @@ function LoginScreen({ onLogin }) {
       setError("Incorrect email or password.");
       setLoading(false);
       return;
-    }
-
-    // Confirm this account is actually staff (admin or super_admin) before letting them in
+                    }
+  // Confirm this account is actually staff (admin or super_admin) before letting them in
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("role")
@@ -857,7 +856,15 @@ function LoginScreen({ onLogin }) {
               <input
                 type="email"
                 value={email}
-           <div className="mb-5">
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="admin@mygospelhub.com"
+                autoComplete="username"
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-lg pl-9 pr-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-amber-500/50 transition-colors"
+              />
+            </div>
+          </div>
+
+          <div className="mb-5">
             <label className="text-xs text-zinc-500 mb-1.5 block">Password</label>
             <div className="relative">
               <Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600" />
@@ -1034,6 +1041,5 @@ export default function AdminApp() {
     );
   }
   return <Dashboard_Shell onLogout={handleLogout} role={role} userEmail={userEmail} />;
-        }
-        
-           
+            }
+      
