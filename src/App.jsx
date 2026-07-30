@@ -173,11 +173,11 @@ function UploadForm({ onUpload }) {
   const [title, setTitle] = useState("");
   const [artist, setArtist] = useState("");
   const [type, setType] = useState("Video");
-  const [genre, setGenre] = useState("Worship");
+  const [genre, setGenre] = useState("");
   const [year, setYear] = useState(new Date().getFullYear());
   const [description, setDescription] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
-  const [fileAttached, setFileAttached] = useState(false);
+  const [mediaFile, setMediaFile] = useState(null);
   const [streamingLink, setStreamingLink] = useState("");
   const [coverFile, setCoverFile] = useState(null);
   const [coverPreview, setCoverPreview] = useState("");
@@ -185,8 +185,8 @@ function UploadForm({ onUpload }) {
   const [submitting, setSubmitting] = useState(false);
 
   const reset = () => {
-    setTitle(""); setArtist(""); setGenre("Worship"); setYear(new Date().getFullYear());
-    setDescription(""); setVideoUrl(""); setFileAttached(false); setStreamingLink("");
+    setTitle(""); setArtist(""); setGenre(""); setYear(new Date().getFullYear());
+    setDescription(""); setVideoUrl(""); setMediaFile(null); setStreamingLink("");
     setCoverFile(null); setCoverPreview(""); setError(""); setOpen(false);
   };
 
@@ -197,14 +197,20 @@ function UploadForm({ onUpload }) {
     setCoverPreview(URL.createObjectURL(file));
   };
 
+  const handleMediaSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setMediaFile(file);
+  };
+
   const submit = async () => {
     setError("");
     if (!title.trim() || !artist.trim()) {
       setError("Title and artist are required.");
       return;
     }
-    if (!fileAttached && !streamingLink.trim()) {
-      setError("Attach a file, or add a streaming link if you're not uploading the file directly.");
+    if (!mediaFile && !streamingLink.trim() && !videoUrl.trim()) {
+      setError("Attach an audio/video file, or add a streaming or video link instead.");
       return;
     }
 
@@ -225,23 +231,36 @@ function UploadForm({ onUpload }) {
       coverUrl = urlData.publicUrl;
     }
 
+    // Upload audio/video file to Supabase Storage, if one was picked
+    let fileUrl = null;
+    if (mediaFile) {
+      const ext = mediaFile.name.split(".").pop();
+      const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      const { error: mediaUploadError } = await supabase.storage.from("media").upload(path, mediaFile);
+      if (mediaUploadError) {
+        setError("File upload failed: " + mediaUploadError.message);
+        setSubmitting(false);
+        return;
+      }
+      const { data: mediaUrlData } = supabase.storage.from("media").getPublicUrl(path);
+      fileUrl = mediaUrlData.publicUrl;
+    }
+
     const { data, error: insertError } = await supabase
       .from("content")
       .insert({
         title: title.trim(),
         artist: artist.trim(),
         type,
-        genre,
+        genre: genre.trim() || null,
         year: year ? Number(year) : null,
         description: description.trim() || null,
         video_url: videoUrl.trim() || null,
         cover_url: coverUrl,
         status: "Published",
         views: 0,
-        // NOTE: real audio/video file upload to Supabase Storage isn't wired up yet —
-        // file_url stays empty until that's built. Cover art and streaming link work today.
-        file_url: null,
-        streaming_link: fileAttached ? null : streamingLink.trim(),
+        file_url: fileUrl,
+        streaming_link: mediaFile ? null : streamingLink.trim() || null,
       })
       .select()
       .single();
@@ -302,9 +321,16 @@ function UploadForm({ onUpload }) {
           </div>
           <div>
             <label className="text-xs text-zinc-500 mb-1.5 block">Genre</label>
-            <select value={genre} onChange={e => setGenre(e.target.value)} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50">
-              {GENRES.map(g => <option key={g}>{g}</option>)}
-            </select>
+            <input
+              list="genre-suggestions"
+              value={genre}
+              onChange={e => setGenre(e.target.value)}
+              placeholder="e.g. Worship, Afrogospel..."
+              className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50"
+            />
+            <datalist id="genre-suggestions">
+              {GENRES.map(g => <option key={g} value={g} />)}
+            </datalist>
           </div>
         </div>
       </div>
@@ -326,27 +352,41 @@ function UploadForm({ onUpload }) {
       </div>
 
       <div className="mb-4">
-        <label className="text-xs text-zinc-500 mb-1.5 block">File</label>
-        <button
-          type="button"
-          onClick={() => setFileAttached(!fileAttached)}
-          className={`w-full border rounded-lg px-3 py-2 text-sm flex items-center gap-2 transition-colors ${
-            fileAttached ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" : "bg-zinc-950 border-dashed border-zinc-800 text-zinc-500 hover:border-zinc-700"
+        <label className="text-xs text-zinc-500 mb-1.5 block">
+          {type === "Audio" ? "Audio file" : "Video file"} <span className="text-zinc-600">(optional if you provide a link below)</span>
+        </label>
+        <label
+          className={`w-full border rounded-lg px-3 py-2 text-sm flex items-center gap-2 cursor-pointer transition-colors ${
+            mediaFile ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" : "bg-zinc-950 border-dashed border-zinc-800 text-zinc-500 hover:border-zinc-700"
           }`}
         >
-          {fileAttached ? <Check size={14} /> : <Upload size={14} />}
-          {fileAttached ? "File attached (placeholder)" : "Drop file or click to browse"}
-        </button>
-        <p className="text-[11px] text-zinc-600 mt-1.5">Real audio/video file storage isn't wired up yet — this toggle just simulates it. Cover art and streaming link both work for real right now.</p>
+          {mediaFile ? <Check size={14} /> : <Upload size={14} />}
+          {mediaFile ? mediaFile.name : "Click to choose a file"}
+          <input
+            type="file"
+            accept={type === "Audio" ? "audio/*" : "video/*"}
+            onChange={handleMediaSelect}
+            className="hidden"
+          />
+        </label>
+        {mediaFile && (
+          <button type="button" onClick={() => setMediaFile(null)} className="text-[11px] text-zinc-500 hover:text-rose-400 mt-1.5">
+            Remove file
+          </button>
+        )}
       </div>
 
-      {type === "Audio" && !fileAttached && (
+      {!mediaFile && (
         <div className="mb-4">
-          <label className="text-xs text-zinc-500 mb-1.5 block">Streaming link <span className="text-zinc-600">(Spotify, Apple Music, Audiomack, etc — used if no file is uploaded)</span></label>
+          <label className="text-xs text-zinc-500 mb-1.5 block">
+            {type === "Audio" ? "Streaming link" : "Video link"} <span className="text-zinc-600">
+              {type === "Audio" ? "(Spotify, Apple Music, Audiomack, etc — used if no file is uploaded)" : "(YouTube, etc — used if no file is uploaded)"}
+            </span>
+          </label>
           <input
             value={streamingLink}
             onChange={e => setStreamingLink(e.target.value)}
-            placeholder="https://open.spotify.com/track/..."
+            placeholder={type === "Audio" ? "https://open.spotify.com/track/..." : "https://youtube.com/watch?v=..."}
             className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50"
           />
         </div>
@@ -413,7 +453,7 @@ function ContentTable({ content, setContent }) {
             </thead>
             <tbody>
               {content.map(c => (
-                <tr key={c.id} className="border-b border-zinc-800/60 last:border-0 hover:bg-zinc-800/30">
+              <tr key={c.id} className="border-b border-zinc-800/60 last:border-0 hover:bg-zinc-800/30">
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-3">
                       <div className="w-9 h-9 rounded-md bg-gradient-to-br from-rose-800 to-zinc-900 flex items-center justify-center shrink-0 overflow-hidden">
@@ -432,9 +472,10 @@ function ContentTable({ content, setContent }) {
                   <td className="px-5 py-3.5 text-zinc-400">{c.type}</td>
                   <td className="px-5 py-3.5">
                     {c.streaming_link ? (
-                       <a href={c.streaming_link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs text-amber-400 hover:underline">
+                      <a href={c.streaming_link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs text-amber-400 hover:underline">
                         <LinkIcon size={12} /> Streaming link
-                      </a>) : (
+                      </a>
+                    ) : (
                       <span className="inline-flex items-center gap-1.5 text-xs text-zinc-500">
                         <Check size={12} /> File
                       </span>
@@ -816,15 +857,7 @@ function LoginScreen({ onLogin }) {
               <input
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@mygospelhub.com"
-                autoComplete="username"
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-lg pl-9 pr-3 py-2.5 text-sm text-zinc-100 outline-none focus:border-amber-500/50 transition-colors"
-              />
-            </div>
-          </div>
-
-          <div className="mb-5">
+           <div className="mb-5">
             <label className="text-xs text-zinc-500 mb-1.5 block">Password</label>
             <div className="relative">
               <Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600" />
@@ -842,7 +875,7 @@ function LoginScreen({ onLogin }) {
             </div>
           </div>
 
-   {error && (
+          {error && (
             <div className="mb-4 text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-lg px-3 py-2">
               {error}
             </div>
@@ -1001,4 +1034,6 @@ export default function AdminApp() {
     );
   }
   return <Dashboard_Shell onLogout={handleLogout} role={role} userEmail={userEmail} />;
-}
+        }
+        
+           
