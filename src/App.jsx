@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { LayoutDashboard, Music2, Newspaper, Users, Upload, Search, Bell, ChevronDown, MoreHorizontal, Check, X, Trash2, Edit3, Plus, Video, Lock, Eye, EyeOff, LogOut, Mail, Link as LinkIcon, Loader2 } from "lucide-react";
@@ -803,8 +802,7 @@ function LoginScreen({ onLogin }) {
       return;
     }
     setLoading(true);
-
-    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
       email: email.trim(),
       password,
     });
@@ -813,8 +811,9 @@ function LoginScreen({ onLogin }) {
       setError("Incorrect email or password.");
       setLoading(false);
       return;
-                    }
-  // Confirm this account is actually staff (admin or super_admin) before letting them in
+    }
+
+    // Confirm this account is actually staff (admin or super_admin) before letting them in
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("role")
@@ -1042,5 +1041,4 @@ export default function AdminApp() {
     );
   }
   return <Dashboard_Shell onLogout={handleLogout} role={role} userEmail={userEmail} />;
-            }
-      
+               }        
