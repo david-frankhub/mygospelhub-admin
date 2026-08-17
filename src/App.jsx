@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { LayoutDashboard, Music2, Newspaper, Users, Upload, Search, Bell, ChevronDown, MoreHorizontal, Check, X, Trash2, Edit3, Plus, Video, Lock, Eye, EyeOff, LogOut, Mail, Link as LinkIcon, Loader2 } from "lucide-react";
 
-// ---------- Supabase connection --------
+// ---------- Supabase connection ----------
 // The anon key below is safe to use in frontend code — real security comes
 // from the Row Level Security rules on the database, not from hiding this key.
 const supabase = createClient(
@@ -849,130 +849,6 @@ function EditGistForm({ item, onSave, onCancel }) {
     <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 mb-6">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-semibold text-zinc-100">Edit gist article</h3>
-        <button onClick={onCancel} className="text-zinc-500 hover:text-zinc-300"><X size={18} /></button>
-      </div>
-
-      <div className="flex gap-4 mb-4">
-        <div className="shrink-0">
-          <label className="text-xs text-zinc-500 mb-1.5 block">Cover image</label>
-          <label className="w-24 h-24 rounded-lg border border-dashed border-zinc-800 bg-zinc-950 flex items-center justify-center cursor-pointer overflow-hidden hover:border-zinc-700 transition-colors">
-            {coverPreview ? (
-              <img src={coverPreview} alt="Cover preview" className="w-full h-full object-cover" />
-            ) : (
-              <Upload size={18} className="text-zinc-600" />
-            )}
-            <input type="file" accept="image/*" onChange={handleCoverSelect} className="hidden" />
-          </label>
-        </div>
-        <div className="flex-1 grid grid-cols-3 gap-4">
-          <div className="col-span-2">
-            <label className="text-xs text-zinc-500 mb-1.5 block">Headline</label>
-            <input value={title} onChange={e => setTitle(e.target.value)} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50" />
-          </div>
-          <div>
-            <label className="text-xs text-zinc-500 mb-1.5 block">Category</label>
-            <select value={category} onChange={e => setCategory(e.target.value)} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50">
-              <option>Concert</option>
-              <option>Rumor</option>
-              <option>Community</option>
-              <option>Release</option>
-            </select>
-          </div>
-          <div className="col-span-3">
-            <label className="text-xs text-zinc-500 mb-1.5 block">Article body</label>
-            <textarea value={body} onChange={e => setBody(e.target.value)} rows={5} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50 resize-none" />
-          </div>
-        </div>
-      </div>
-
-      {error && (
-        <div className="mb-4 text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-lg px-3 py-2">{error}</div>
-      )}
-
-      <div className="flex gap-2">
-        <button onClick={onCancel} className="flex-1 py-2.5 text-sm font-medium text-zinc-300 bg-zinc-800/60 hover:bg-zinc-800 rounded-lg transition-colors">Cancel</button>
-        <button onClick={save} disabled={saving} className="flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-semibold text-zinc-950 bg-amber-500 hover:bg-amber-400 disabled:opacity-60 rounded-lg transition-colors">
-          {saving && <Loader2 size={14} className="animate-spin" />}
-          {saving ? "Saving..." : "Save changes"}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function EditGistForm({ item, onSave, onCancel }) {
-  const [title, setTitle] = useState(item.title || "");
-  const [category, setCategory] = useState(item.category || "Community");
-  const [body, setBody] = useState(item.body || "");
-  const [coverFile, setCoverFile] = useState(null);
-  const [coverPreview, setCoverPreview] = useState(item.cover_url || "");
-  const [error, setError] = useState("");
-  const [saving, setSaving] = useState(false);
-
-  const handleCoverSelect = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setCoverFile(file);
-    setCoverPreview(URL.createObjectURL(file));
-  };
-
-  const save = async () => {
-    setError("");
-    if (!title.trim()) {
-      setError("Headline is required.");
-      return;
-    }
-    setSaving(true);
-
-    // Only touch cover_url if a new image was actually picked — otherwise
-    // leave the existing one alone.
-    let coverUrl = item.cover_url || null;
-    if (coverFile) {
-      let jpegFile;
-      try {
-        jpegFile = await convertImageToJpeg(coverFile);
-      } catch (convertError) {
-        setError("Couldn't process cover image: " + convertError.message);
-        setSaving(false);
-        return;
-      }
-      const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.jpeg`;
-      const { error: uploadError } = await supabase.storage.from("covers").upload(path, jpegFile);
-      if (uploadError) {
-        setError("Cover image upload failed: " + uploadError.message);
-        setSaving(false);
-        return;
-      }
-      const { data: urlData } = supabase.storage.from("covers").getPublicUrl(path);
-      coverUrl = urlData.publicUrl;
-    }
-
-    const { data, error: updateError } = await supabase
-      .from("gist_articles")
-      .update({
-        title: title.trim(),
-        category,
-        body: body.trim() || null,
-        cover_url: coverUrl,
-      })
-      .eq("id", item.id)
-      .select()
-      .single();
-
-    setSaving(false);
-
-    if (updateError) {
-      setError("Couldn't save changes: " + updateError.message);
-      return;
-    }
-
-    onSave(data);
-  };
-
-  return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 mb-6">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-semibold text-zinc-100">Edit article</h3>
         <button onClick={onCancel} className="text-zinc-500 hover:text-zinc-300"><X size={18} /></button>
       </div>
 
