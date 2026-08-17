@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { LayoutDashboard, Music2, Newspaper, Users, Upload, Search, Bell, ChevronDown, MoreHorizontal, Check, X, Trash2, Edit3, Plus, Video, Lock, Eye, EyeOff, LogOut, Mail, Link as LinkIcon, Loader2 } from "lucide-react";
 
-// ---------- Supabase connection ----------
+// ---------- Supabase connection --------
 // The anon key below is safe to use in frontend code — real security comes
 // from the Row Level Security rules on the database, not from hiding this key.
 const supabase = createClient(
