@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { LayoutDashboard, Music2, Newspaper, Users, Upload, Search, Bell, ChevronDown, MoreHorizontal, Check, X, Trash2, Edit3, Plus, Video, Lock, Eye, EyeOff, LogOut, Mail, Link as LinkIcon, Loader2 } from "lucide-react";
+import { LayoutDashboard, Music2, Newspaper, Users, Upload, Search, Bell, ChevronDown, MoreHorizontal, Check, X, Trash2, Edit3, Plus, Video, Lock, Eye, EyeOff, LogOut, Mail, Link as LinkIcon, Loader2, Inbox, Phone, Banknote } from "lucide-react";
 
 // ---------- Supabase connection ----------
 // The anon key below is safe to use in frontend code — real security comes
@@ -73,6 +73,9 @@ function StatusPill({ status }) {
     Active: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
     Flagged: "bg-rose-500/10 text-rose-400 border-rose-500/20",
     Visible: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+    "Awaiting payment": "bg-amber-500/10 text-amber-400 border-amber-500/20",
+    Paid: "bg-sky-500/10 text-sky-400 border-sky-500/20",
+    Approved: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
   };
   return (
     <span className={`text-[11px] font-mono px-2.5 py-1 rounded-full border ${map[status] || ""}`}>
@@ -81,18 +84,20 @@ function StatusPill({ status }) {
   );
 }
 
-function SidebarLink({ icon: Icon, label, active, onClick, badge }) {
+function TopNavTab({ icon: Icon, label, active, onClick, badge }) {
   return (
     <button
       onClick={onClick}
-      className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-        active ? "bg-amber-500/10 text-amber-400" : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/60"
+      className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors whitespace-nowrap shrink-0 ${
+        active ? "bg-amber-500 text-zinc-950" : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/70"
       }`}
     >
-      <Icon size={17} strokeWidth={2} />
-      <span className="flex-1 text-left">{label}</span>
+      <Icon size={15} strokeWidth={2} />
+      <span>{label}</span>
       {badge ? (
-        <span className="text-[10px] font-mono bg-rose-500/15 text-rose-400 px-1.5 py-0.5 rounded-full">{badge}</span>
+        <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded-full ${active ? "bg-zinc-950/20 text-zinc-950" : "bg-rose-500/15 text-rose-400"}`}>
+          {badge}
+        </span>
       ) : null}
     </button>
   );
@@ -1210,6 +1215,244 @@ function UsersAndComments({ users, setUsers, comments, setComments, role }) {
   );
 }
 
+// ---------- Submissions (public uploads waiting on payment/approval) ----------
+const SUBMISSION_PRICES = { song: 5000, video: 10000, gist: 2000 };
+const SUBMISSION_LABELS = { awaiting_payment: "Awaiting payment", paid: "Paid", approved: "Approved", rejected: "Rejected" };
+
+function SubmissionsManager({ submissions, setSubmissions, content, setContent, gist, setGist }) {
+  const [filter, setFilter] = useState("awaiting_payment");
+  const [busyId, setBusyId] = useState(null);
+  const [error, setError] = useState("");
+
+  const counts = {
+    awaiting_payment: submissions.filter(s => s.status === "awaiting_payment").length,
+    paid: submissions.filter(s => s.status === "paid").length,
+    approved: submissions.filter(s => s.status === "approved").length,
+    rejected: submissions.filter(s => s.status === "rejected").length,
+  };
+
+  const visible = submissions.filter(s => s.status === filter);
+
+  const setStatus = async (id, status) => {
+    setError("");
+    setBusyId(id);
+    const { error: updateError } = await supabase.from("pending_submissions").update({ status }).eq("id", id);
+    setBusyId(null);
+    if (updateError) {
+      setError("Couldn't update submission: " + updateError.message);
+      return false;
+    }
+    setSubmissions(submissions.map(s => s.id === id ? { ...s, status } : s));
+    return true;
+  };
+
+  // Approve = copy the submission into the live table (content or gist_articles),
+  // published immediately, then mark the submission as approved.
+  const approve = async (s) => {
+    setError("");
+    setBusyId(s.id);
+
+    if (s.type === "gist") {
+      const { data, error: insertError } = await supabase
+        .from("gist_articles")
+        .insert({
+          title: s.title,
+          category: s.category || "General",
+          body: s.body || null,
+          cover_url: s.cover_url || null,
+          status: "Published",
+          reads: 0,
+        })
+        .select()
+        .single();
+      if (insertError) {
+        setBusyId(null);
+        setError("Couldn't publish gist: " + insertError.message);
+        return;
+      }
+      setGist([data, ...gist]);
+    } else {
+      const yearNum = s.year && !isNaN(Number(s.year)) ? Number(s.year) : null;
+      const { data, error: insertError } = await supabase
+        .from("content")
+        .insert({
+          title: s.title,
+          artist: s.artist || "",
+          type: s.type === "video" ? "Video" : "Audio",
+          genre: s.genre || null,
+          producer: s.producer || null,
+          year: yearNum,
+          description: s.description || null,
+          lyrics: s.type === "song" ? (s.lyrics || null) : null,
+          cover_url: s.cover_url || null,
+          file_url: s.file_url || null,
+          streaming_link: s.file_url ? null : (s.streaming_link || null),
+          status: "Published",
+          views: 0,
+        })
+        .select()
+        .single();
+      if (insertError) {
+        setBusyId(null);
+        setError("Couldn't publish: " + insertError.message);
+        return;
+      }
+      setContent([data, ...content]);
+    }
+
+    await setStatus(s.id, "approved");
+  };
+
+  const filters = [
+    { key: "awaiting_payment", label: "Awaiting payment" },
+    { key: "paid", label: "Paid" },
+    { key: "approved", label: "Approved" },
+    { key: "rejected", label: "Rejected" },
+  ];
+
+  const typeLabel = { song: "Song", video: "Video", gist: "Gist" };
+
+  return (
+    <div>
+      <h2 className="text-xl font-semibold text-zinc-50 mb-1" style={{ fontFamily: "'Fraunces', serif" }}>Submissions</h2>
+      <p className="text-sm text-zinc-500 mb-6">Uploads from visitors. Confirm their payment, then approve to publish it live.</p>
+
+      <div className="flex gap-1 mb-6 bg-zinc-900 border border-zinc-800 rounded-lg p-1 w-full sm:w-fit overflow-x-auto">
+        {filters.map(f => (
+          <button
+            key={f.key}
+            onClick={() => setFilter(f.key)}
+            className={`px-3.5 py-1.5 rounded-md text-sm font-medium transition-colors whitespace-nowrap flex items-center gap-2 ${
+              filter === f.key ? "bg-amber-500/10 text-amber-400" : "text-zinc-500 hover:text-zinc-300"
+            }`}
+          >
+            {f.label}
+            <span className="text-[10px] font-mono text-zinc-600">{counts[f.key]}</span>
+          </button>
+        ))}
+      </div>
+
+      {error && <div className="mb-4 text-sm text-rose-400 bg-rose-500/10 border border-rose-500/20 rounded-lg px-4 py-3">{error}</div>}
+
+      {visible.length === 0 ? (
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-10 text-center text-sm text-zinc-500">
+          Nothing here yet.
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {visible.map(s => {
+            const busy = busyId === s.id;
+            const waText = encodeURIComponent(`Hello ${s.submitter_name}, this is MyGospelHub regarding your ${typeLabel[s.type] || "submission"} "${s.title}".`);
+            const waNumber = (s.submitter_phone || "").replace(/\D/g, "").replace(/^0/, "234");
+            return (
+              <div key={s.id} className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
+                <div className="flex gap-4">
+                  <div className="w-20 h-20 rounded-lg bg-gradient-to-br from-rose-800 to-zinc-900 overflow-hidden shrink-0 flex items-center justify-center">
+                    {s.cover_url ? (
+                      <img src={s.cover_url} alt="" className="w-full h-full object-cover" />
+                    ) : s.type === "video" ? <Video size={20} className="text-amber-400" /> : s.type === "gist" ? <Newspaper size={20} className="text-amber-400" /> : <Music2 size={20} className="text-amber-400" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-3 mb-1.5">
+                      <div className="min-w-0">
+                        <div className="text-zinc-100 font-medium truncate">{s.title}</div>
+                        <div className="text-xs text-zinc-500 truncate">
+                          {typeLabel[s.type] || s.type}{s.artist ? ` · ${s.artist}` : ""}{s.genre ? ` · ${s.genre}` : ""}{s.category ? ` · ${s.category}` : ""}
+                        </div>
+                      </div>
+                      <StatusPill status={SUBMISSION_LABELS[s.status] || s.status} />
+                    </div>
+                    <div className="flex items-center gap-3 flex-wrap text-xs text-zinc-500">
+                      <span className="inline-flex items-center gap-1.5 text-amber-400 font-mono">
+                        <Banknote size={12} /> ₦{(SUBMISSION_PRICES[s.type] || 0).toLocaleString()}
+                      </span>
+                      <span>{timeAgo(s.created_at)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4 pt-4 border-t border-zinc-800 grid sm:grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <div className="text-[11px] font-mono uppercase tracking-wider text-zinc-600 mb-1">Submitted by</div>
+                    <div className="text-zinc-200">{s.submitter_name}</div>
+                    <div className="text-xs text-zinc-500 flex items-center gap-1.5 mt-0.5"><Phone size={11} /> {s.submitter_phone}</div>
+                    {s.submitter_email && <div className="text-xs text-zinc-500 flex items-center gap-1.5 mt-0.5"><Mail size={11} /> {s.submitter_email}</div>}
+                  </div>
+                  <div>
+                    <div className="text-[11px] font-mono uppercase tracking-wider text-zinc-600 mb-1">Media</div>
+                    {s.file_url ? (
+                      s.type === "video" ? (
+                        <video src={s.file_url} controls preload="none" className="w-full max-w-xs rounded-lg bg-black" />
+                      ) : s.type === "song" ? (
+                        <audio src={s.file_url} controls preload="none" className="w-full max-w-xs" />
+                      ) : null
+                    ) : s.streaming_link ? (
+                      <a href={s.streaming_link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs text-amber-400 hover:underline">
+                        <LinkIcon size={12} /> Streaming link
+                      </a>
+                    ) : s.type === "gist" ? (
+                      <span className="text-xs text-zinc-500">Article only</span>
+                    ) : (
+                      <span className="text-xs text-zinc-600">No media</span>
+                    )}
+                  </div>
+                </div>
+
+                {s.type === "gist" && s.body && (
+                  <details className="mt-3">
+                    <summary className="text-xs text-amber-400 cursor-pointer">Read article</summary>
+                    <p className="text-sm text-zinc-400 whitespace-pre-wrap mt-2">{s.body}</p>
+                  </details>
+                )}
+                {s.type !== "gist" && (s.description || s.lyrics) && (
+                  <details className="mt-3">
+                    <summary className="text-xs text-amber-400 cursor-pointer">Description{s.lyrics ? " & lyrics" : ""}</summary>
+                    {s.description && <p className="text-sm text-zinc-400 whitespace-pre-wrap mt-2">{s.description}</p>}
+                    {s.lyrics && <p className="text-sm text-zinc-500 whitespace-pre-wrap mt-2">{s.lyrics}</p>}
+                  </details>
+                )}
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {s.submitter_phone && (
+                    <a
+                      href={`https://wa.me/${waNumber}?text=${waText}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-medium text-zinc-300 bg-zinc-800/60 hover:bg-emerald-500/10 hover:text-emerald-400 rounded-lg transition-colors"
+                    >
+                      <Phone size={13} /> WhatsApp
+                    </a>
+                  )}
+                  {s.status === "awaiting_payment" && (
+                    <button disabled={busy} onClick={() => setStatus(s.id, "paid")} className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-medium text-zinc-300 bg-zinc-800/60 hover:bg-sky-500/10 hover:text-sky-400 rounded-lg transition-colors disabled:opacity-50">
+                      <Banknote size={13} /> Mark as paid
+                    </button>
+                  )}
+                  {(s.status === "awaiting_payment" || s.status === "paid") && (
+                    <button disabled={busy} onClick={() => approve(s)} className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-semibold text-zinc-950 bg-amber-500 hover:bg-amber-400 rounded-lg transition-colors disabled:opacity-50">
+                      {busy ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Approve &amp; publish
+                    </button>
+                  )}
+                  {s.status !== "rejected" && s.status !== "approved" && (
+                    <button disabled={busy} onClick={() => setStatus(s.id, "rejected")} className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-medium text-zinc-300 bg-zinc-800/60 hover:bg-rose-500/10 hover:text-rose-400 rounded-lg transition-colors disabled:opacity-50">
+                      <X size={13} /> Reject
+                    </button>
+                  )}
+                  {s.status === "rejected" && (
+                    <button disabled={busy} onClick={() => setStatus(s.id, "awaiting_payment")} className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-medium text-zinc-300 bg-zinc-800/60 hover:bg-amber-500/10 hover:text-amber-400 rounded-lg transition-colors disabled:opacity-50">
+                      Restore
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ---------- Login screen ----------
 function LoginScreen({ onLogin }) {
   const [email, setEmail] = useState("");
@@ -1335,17 +1578,21 @@ function Dashboard_Shell({ onLogout, role, userEmail }) {
   const [gist, setGist] = useState([]);
   const [users, setUsers] = useState([]);
   const [comments, setComments] = useState([]);
+  const [submissions, setSubmissions] = useState([]);
+  const [submissionsError, setSubmissionsError] = useState("");
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
 
   const loadAll = async () => {
     setLoading(true);
     setLoadError("");
-    const [contentRes, gistRes, usersRes, commentsRes] = await Promise.all([
+    setSubmissionsError("");
+    const [contentRes, gistRes, usersRes, commentsRes, submissionsRes] = await Promise.all([
       supabase.from("content").select("*").order("created_at", { ascending: false }),
       supabase.from("gist_articles").select("*").order("created_at", { ascending: false }),
       supabase.from("profiles").select("*").order("created_at", { ascending: false }),
       supabase.from("comments").select("*").order("created_at", { ascending: false }),
+      supabase.from("pending_submissions").select("*").order("created_at", { ascending: false }),
     ]);
 
     const firstError = contentRes.error || gistRes.error || usersRes.error || commentsRes.error;
@@ -1359,6 +1606,13 @@ function Dashboard_Shell({ onLogout, role, userEmail }) {
     setGist(gistRes.data || []);
     setUsers(usersRes.data || []);
     setComments(commentsRes.data || []);
+    // Submissions load separately so a problem there never blocks the rest of the dashboard
+    if (submissionsRes.error) {
+      setSubmissionsError("Couldn't load submissions: " + submissionsRes.error.message);
+      setSubmissions([]);
+    } else {
+      setSubmissions(submissionsRes.data || []);
+    }
     setLoading(false);
   };
 
@@ -1367,77 +1621,65 @@ function Dashboard_Shell({ onLogout, role, userEmail }) {
   }, []);
 
   const flaggedCount = comments.filter(c => c.status === "Flagged").length + users.filter(u => u.status === "Flagged" || u.status === "flagged").length;
+  const openSubmissions = submissions.filter(s => s.status === "awaiting_payment" || s.status === "paid").length;
 
   const nav = [
-    { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { key: "dashboard", label: "Overview", icon: LayoutDashboard },
+    { key: "submissions", label: "Submissions", icon: Inbox, badge: openSubmissions || null },
     { key: "content", label: "Songs & Videos", icon: Music2 },
-    { key: "gist", label: "Gist Articles", icon: Newspaper },
-    { key: "users", label: "Users & Comments", icon: Users, badge: flaggedCount || null },
+    { key: "gist", label: "Gist", icon: Newspaper },
+    { key: "users", label: "Community", icon: Users, badge: flaggedCount || null },
   ];
 
-  const pageTitle = { dashboard: "Dashboard", content: "Songs & Videos", gist: "Gist Articles", users: "Users & Comments" }[page];
-
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex" style={{ fontFamily: "'Inter', sans-serif" }}>
-      {/* Sidebar */}
-      <aside className="w-60 border-r border-zinc-800 flex flex-col shrink-0">
-        <div className="px-5 py-6 border-b border-zinc-800">
-          <div className="flex items-baseline gap-0.5" style={{ fontFamily: "'Fraunces', serif" }}>
-            <span className="text-lg font-semibold">MyGospelHub</span>
-            <span className="text-amber-400 text-lg">.</span>
-          </div>
-          <div className="text-[10px] font-mono text-zinc-600 uppercase tracking-wider mt-0.5">Admin Console</div>
-        </div>
-        <nav className="flex-1 px-3 py-4 space-y-1">
-          {nav.map(item => (
-            <SidebarLink key={item.key} icon={item.icon} label={item.label} active={page === item.key} onClick={() => setPage(item.key)} badge={item.badge} />
-          ))}
-        </nav>
-        <div className="px-4 py-4 border-t border-zinc-800 flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500 to-rose-800 shrink-0"></div>
-          <div className="flex-1 min-w-0">
-            <div className="text-sm text-zinc-200 font-medium truncate">{role === "super_admin" ? "Super Admin" : "Admin"}</div>
-            <div className="text-xs text-zinc-500 truncate">{userEmail}</div>
-          </div>
-          <button onClick={onLogout} title="Sign out" className="p-1.5 text-zinc-600 hover:text-rose-400 hover:bg-rose-500/10 rounded-md transition-colors shrink-0">
-            <LogOut size={15} />
-          </button>
-        </div>
-      </aside>
-
-      {/* Main */}
-      <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-16 border-b border-zinc-800 flex items-center justify-between px-6 shrink-0">
-          <div className="flex items-center gap-2 text-sm text-zinc-500">
-            <span>Admin</span>
-            <span className="text-zinc-700">/</span>
-            <span className="text-zinc-200">{pageTitle}</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600" />
-              <input placeholder="Search..." className="bg-zinc-900 border border-zinc-800 rounded-lg pl-9 pr-3 py-1.5 text-sm text-zinc-200 outline-none focus:border-amber-500/50 w-48" />
+    <div className="min-h-screen bg-zinc-950 text-zinc-100" style={{ fontFamily: "'Inter', sans-serif" }}>
+      {/* Top bar */}
+      <header className="sticky top-0 z-30 bg-zinc-950/90 backdrop-blur border-b border-zinc-800">
+        <div className="max-w-6xl mx-auto px-4 sm:px-8 h-16 flex items-center justify-between gap-4">
+          <div className="shrink-0">
+            <div className="flex items-baseline gap-0.5" style={{ fontFamily: "'Fraunces', serif" }}>
+              <span className="text-lg font-semibold">MyGospelHub</span>
+              <span className="text-amber-400 text-lg">.</span>
             </div>
-            <button className="relative p-2 text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900 rounded-lg transition-colors">
-              <Bell size={16} />
-              {flaggedCount > 0 && <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-rose-500 rounded-full"></span>}
+            <div className="text-[10px] font-mono text-zinc-600 uppercase tracking-wider -mt-0.5">Admin Console</div>
+          </div>
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="hidden sm:block text-right min-w-0">
+              <div className="text-xs text-zinc-300 font-medium">{role === "super_admin" ? "Super Admin" : "Admin"}</div>
+              <div className="text-[11px] text-zinc-600 truncate max-w-[180px]">{userEmail}</div>
+            </div>
+            <button onClick={onLogout} title="Sign out" className="p-2 text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors shrink-0">
+              <LogOut size={16} />
             </button>
           </div>
-        </header>
+        </div>
+        <div className="max-w-6xl mx-auto px-4 sm:px-8 pb-3">
+          <nav className="flex items-center gap-1.5 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+            {nav.map(item => (
+              <TopNavTab key={item.key} icon={item.icon} label={item.label} active={page === item.key} onClick={() => setPage(item.key)} badge={item.badge} />
+            ))}
+          </nav>
+        </div>
+      </header>
 
-        <main className="flex-1 overflow-y-auto p-6">
-          {loading && <LoadingBlock label="Loading dashboard..." />}
-          {!loading && loadError && <ErrorBlock message={loadError} onRetry={loadAll} />}
-          {!loading && !loadError && (
-            <>
-              {page === "dashboard" && <Dashboard content={content} gist={gist} users={users} comments={comments} />}
-              {page === "content" && <ContentTable content={content} setContent={setContent} />}
-              {page === "gist" && <GistManager gist={gist} setGist={setGist} />}
-              {page === "users" && <UsersAndComments users={users} setUsers={setUsers} comments={comments} setComments={setComments} role={role} />}
-            </>
-          )}
-        </main>
-      </div>
+      {/* Main */}
+      <main className="max-w-6xl mx-auto px-4 sm:px-8 py-8">
+        {loading && <LoadingBlock label="Loading dashboard..." />}
+        {!loading && loadError && <ErrorBlock message={loadError} onRetry={loadAll} />}
+        {!loading && !loadError && (
+          <>
+            {page === "dashboard" && <Dashboard content={content} gist={gist} users={users} comments={comments} />}
+            {page === "submissions" && (
+              submissionsError
+                ? <ErrorBlock message={submissionsError} onRetry={loadAll} />
+                : <SubmissionsManager submissions={submissions} setSubmissions={setSubmissions} content={content} setContent={setContent} gist={gist} setGist={setGist} />
+            )}
+            {page === "content" && <ContentTable content={content} setContent={setContent} />}
+            {page === "gist" && <GistManager gist={gist} setGist={setGist} />}
+            {page === "users" && <UsersAndComments users={users} setUsers={setUsers} comments={comments} setComments={setComments} role={role} />}
+          </>
+        )}
+      </main>
     </div>
   );
 }
