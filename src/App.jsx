@@ -213,7 +213,7 @@ function UploadForm({ onUpload }) {
   const [type, setType] = useState("Video");
   const [genre, setGenre] = useState("Worship");
   const [producer, setProducer] = useState("");
-  const [uploadedBy, setUploadedBy] = useState("");
+  const [uploadedBy, setUploadedBy] = useState("MyGospelHub");
   const [releaseDate, setReleaseDate] = useState("");
   const [year, setYear] = useState(new Date().getFullYear());
   const [description, setDescription] = useState("");
@@ -228,7 +228,7 @@ function UploadForm({ onUpload }) {
   const [submitting, setSubmitting] = useState(false);
 
   const reset = () => {
-    setTitle(""); setArtist(""); setGenre("Worship"); setProducer(""); setUploadedBy(""); setReleaseDate(""); setYear(new Date().getFullYear());
+    setTitle(""); setArtist(""); setGenre("Worship"); setProducer(""); setUploadedBy("MyGospelHub"); setReleaseDate(""); setYear(new Date().getFullYear());
     setDescription(""); setLyrics(""); setVideoUrl(""); setMediaFile(null); setUploadProgress(0); setStreamingLink("");
     setCoverFile(null); setCoverPreview(""); setError(""); setOpen(false);
   };
@@ -317,12 +317,12 @@ function UploadForm({ onUpload }) {
         year: year ? Number(year) : null,
         description: description.trim() || null,
         lyrics: type === "Audio" ? (lyrics.trim() || null) : null,
-        video_url: videoUrl.trim() || null,
+        video_url: type === "Video" ? (videoUrl.trim() || null) : null,
         cover_url: coverUrl,
         status: "Published",
         views: 0,
         file_url: fileUrl,
-        streaming_link: mediaFile ? null : streamingLink.trim(),
+        streaming_link: type === "Audio" ? (streamingLink.trim() || null) : null,
       })
       .select()
       .single();
@@ -403,12 +403,14 @@ function UploadForm({ onUpload }) {
         </div>
         <div>
           <label className="text-xs text-zinc-500 mb-1.5 block">Posted by <span className="text-zinc-600">(shown as "By ...")</span></label>
-          <input value={uploadedBy} onChange={e => setUploadedBy(e.target.value)} placeholder="e.g. MyGospelHub" className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50" />
+          <input value={uploadedBy} onChange={e => setUploadedBy(e.target.value)} placeholder="MyGospelHub" className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50" />
         </div>
-        <div>
-          <label className="text-xs text-zinc-500 mb-1.5 block">Official video link <span className="text-zinc-600">(optional)</span></label>
-          <input value={videoUrl} onChange={e => setVideoUrl(e.target.value)} placeholder="YouTube link, etc." className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50" />
-        </div>
+        {type === "Video" && (
+          <div>
+            <label className="text-xs text-zinc-500 mb-1.5 block">Official video link <span className="text-zinc-600">(optional)</span></label>
+            <input value={videoUrl} onChange={e => setVideoUrl(e.target.value)} placeholder="YouTube link, etc." className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50" />
+          </div>
+        )}
       </div>
 
       <div className="mb-4">
@@ -444,9 +446,9 @@ function UploadForm({ onUpload }) {
         <p className="text-[11px] text-zinc-600 mt-1.5">Large files may take a moment to upload depending on your connection.</p>
       </div>
 
-      {type === "Audio" && !mediaFile && (
+      {type === "Audio" && (
         <div className="mb-4">
-          <label className="text-xs text-zinc-500 mb-1.5 block">Streaming link <span className="text-zinc-600">(Spotify, Apple Music, Audiomack, etc — used if no file is uploaded)</span></label>
+          <label className="text-xs text-zinc-500 mb-1.5 block">Streaming link <span className="text-zinc-600">(optional — Spotify, Apple Music, YouTube, Audiomack, etc. Add it with or without a file)</span></label>
           <input
             value={streamingLink}
             onChange={e => setStreamingLink(e.target.value)}
@@ -473,7 +475,7 @@ function EditContentForm({ item, onSave, onCancel }) {
   const [artist, setArtist] = useState(item.artist || "");
   const [genre, setGenre] = useState(item.genre || "");
   const [producer, setProducer] = useState(item.producer || "");
-  const [uploadedBy, setUploadedBy] = useState(item.uploaded_by || "");
+  const [uploadedBy, setUploadedBy] = useState(item.uploaded_by || "MyGospelHub");
   const [releaseDate, setReleaseDate] = useState(item.release_date ? (d => new Date(d.getTime() - d.getTimezoneOffset()*60000).toISOString().slice(0,16))(new Date(item.release_date)) : "");
   const [year, setYear] = useState(item.year || new Date().getFullYear());
   const [description, setDescription] = useState(item.description || "");
@@ -535,7 +537,7 @@ function EditContentForm({ item, onSave, onCancel }) {
         year: year ? Number(year) : null,
         description: description.trim() || null,
         lyrics: item.type === "Audio" ? (lyrics.trim() || null) : item.lyrics,
-        video_url: videoUrl.trim() || null,
+        video_url: item.type === "Video" ? (videoUrl.trim() || null) : item.video_url,
         streaming_link: streamingLink.trim() || null,
         cover_url: coverUrl,
       })
@@ -605,10 +607,12 @@ function EditContentForm({ item, onSave, onCancel }) {
           <label className="text-xs text-zinc-500 mb-1.5 block">Posted by <span className="text-zinc-600">(shown as "By ...")</span></label>
           <input value={uploadedBy} onChange={e => setUploadedBy(e.target.value)} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50" />
         </div>
-        <div>
-          <label className="text-xs text-zinc-500 mb-1.5 block">Official video link <span className="text-zinc-600">(optional)</span></label>
-          <input value={videoUrl} onChange={e => setVideoUrl(e.target.value)} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50" />
-        </div>
+        {item.type === "Video" && (
+  <div>
+            <label className="text-xs text-zinc-500 mb-1.5 block">Official video link <span className="text-zinc-600">(optional)</span></label>
+            <input value={videoUrl} onChange={e => setVideoUrl(e.target.value)} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50" />
+          </div>
+        )}
       </div>
 
       <div className="mb-4">
@@ -624,7 +628,7 @@ function EditContentForm({ item, onSave, onCancel }) {
       )}
 
       <div className="mb-4">
-        <label className="text-xs text-zinc-500 mb-1.5 block">Streaming link <span className="text-zinc-600">(used only if no file was uploaded)</span></label>
+        <label className="text-xs text-zinc-500 mb-1.5 block">Streaming link <span className="text-zinc-600">(optional — shown next to Play and Download)</span></label>
         <input value={streamingLink} onChange={e => setStreamingLink(e.target.value)} placeholder="https://open.spotify.com/track/..." className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50" />
       </div>
 
@@ -812,7 +816,7 @@ function ContentTable({ content, setContent }) {
 function EditGistForm({ item, onSave, onCancel }) {
   const [title, setTitle] = useState(item.title || "");
   const [category, setCategory] = useState(item.category || "Community");
-  const [uploadedBy, setUploadedBy] = useState(item.uploaded_by || "");
+  const [uploadedBy, setUploadedBy] = useState(item.uploaded_by || "MyGospelHub");
   const [body, setBody] = useState(item.body || "");
   const [coverFile, setCoverFile] = useState(null);
   const [coverPreview, setCoverPreview] = useState(item.cover_url || "");
@@ -949,7 +953,7 @@ function GistManager({ gist, setGist }) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("Community");
-  const [uploadedBy, setUploadedBy] = useState("");
+  const [uploadedBy, setUploadedBy] = useState("MyGospelHub");
   const [body, setBody] = useState("");
   const [coverFile, setCoverFile] = useState(null);
   const [coverPreview, setCoverPreview] = useState("");
@@ -957,7 +961,7 @@ function GistManager({ gist, setGist }) {
   const [submitting, setSubmitting] = useState(false);
 
   const resetForm = () => {
-    setTitle(""); setCategory("Community"); setUploadedBy(""); setBody("");
+    setTitle(""); setCategory("Community"); setUploadedBy("MyGospelHub"); setBody("");
     setCoverFile(null); setCoverPreview(""); setError(""); setOpen(false);
   };
 
@@ -1092,7 +1096,7 @@ function GistManager({ gist, setGist }) {
               </div>
               <div className="col-span-3">
                 <label className="text-xs text-zinc-500 mb-1.5 block">Posted by <span className="text-zinc-600">(shown as "By ...")</span></label>
-                <input value={uploadedBy} onChange={e => setUploadedBy(e.target.value)} placeholder="e.g. MyGospelHub" className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50" />
+                <input value={uploadedBy} onChange={e => setUploadedBy(e.target.value)} placeholder="MyGospelHub" className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50" />
               </div>
               <div className="col-span-3">
                 <label className="text-xs text-zinc-500 mb-1.5 block">Article body</label>
@@ -1311,7 +1315,7 @@ function SubmissionsManager({ submissions, setSubmissions, content, setContent, 
         .insert({
           title: s.title,
           category: s.category || "General",
-          uploaded_by: s.submitter_name || null,
+          uploaded_by: "MyGospelHub",
           body: s.body || null,
           cover_url: s.cover_url || null,
           status: "Published",
@@ -1335,13 +1339,13 @@ function SubmissionsManager({ submissions, setSubmissions, content, setContent, 
           type: s.type === "video" ? "Video" : "Audio",
           genre: s.genre || null,
           producer: s.producer || null,
-          uploaded_by: s.submitter_name || null,
+          uploaded_by: "MyGospelHub",
           year: yearNum,
           description: s.description || null,
           lyrics: s.type === "song" ? (s.lyrics || null) : null,
           cover_url: s.cover_url || null,
           file_url: s.file_url || null,
-          streaming_link: s.file_url ? null : (s.streaming_link || null),
+          streaming_link: s.streaming_link || null,
           status: "Published",
           views: 0,
         })
