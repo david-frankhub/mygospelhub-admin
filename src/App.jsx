@@ -920,6 +920,12 @@ function EditGistForm({ item, onSave, onCancel }) {
               <option>Rumor</option>
               <option>Community</option>
               <option>Release</option>
+              <option>Church Life</option>
+              <option>Music Tips</option>
+              <option>Worship</option>
+              <option>Devotional</option>
+              <option>Faith and Encouragement</option>
+              <option>Artist Spotlight</option>
               <option>Entertainment</option>
               <option>Sports</option>
               <option>Politics</option>
@@ -1092,6 +1098,12 @@ function GistManager({ gist, setGist }) {
                   <option>Rumor</option>
                   <option>Community</option>
                   <option>Release</option>
+                  <option>Church Life</option>
+                  <option>Music Tips</option>
+                  <option>Worship</option>
+                  <option>Devotional</option>
+                  <option>Faith and Encouragement</option>
+                  <option>Artist Spotlight</option>
                   <option>Entertainment</option>
                   <option>Sports</option>
                   <option>Politics</option>
