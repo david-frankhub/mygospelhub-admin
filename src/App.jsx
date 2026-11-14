@@ -41,13 +41,15 @@ function convertImageToJpeg(file) {
     const objectUrl = URL.createObjectURL(file);
     img.onload = () => {
       const canvas = document.createElement("canvas");
-      canvas.width = img.width;
-      canvas.height = img.height;
+      // Shrink big phone photos: covers never display larger than ~600px, and big files cost bandwidth
+      const scale = Math.min(1, 1200 / Math.max(img.width, img.height));
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
       const ctx = canvas.getContext("2d");
       // Fill white behind transparent PNGs so they don't turn black on JPEG
       ctx.fillStyle = "#FFFFFF";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(img, 0, 0);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       canvas.toBlob(
         (blob) => {
           URL.revokeObjectURL(objectUrl);
@@ -55,7 +57,7 @@ function convertImageToJpeg(file) {
           resolve(new File([blob], "cover.jpeg", { type: "image/jpeg" }));
         },
         "image/jpeg",
-        0.9
+        0.82
       );
     };
     img.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error("Couldn't read image file")); };
