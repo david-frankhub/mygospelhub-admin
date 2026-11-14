@@ -223,7 +223,9 @@ function UploadForm({ onUpload }) {
   const [videoUrl, setVideoUrl] = useState("");
   const [mediaFile, setMediaFile] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [streamingLink, setStreamingLink] = useState("");
+  const [youtubeUrl, setYoutubeUrl] = useState("");
+  const [spotifyUrl, setSpotifyUrl] = useState("");
+  const [audiomackUrl, setAudiomackUrl] = useState("");
   const [coverFile, setCoverFile] = useState(null);
   const [coverPreview, setCoverPreview] = useState("");
   const [error, setError] = useState("");
@@ -231,7 +233,7 @@ function UploadForm({ onUpload }) {
 
   const reset = () => {
     setTitle(""); setArtist(""); setGenre("Worship"); setProducer(""); setUploadedBy("MyGospelHub"); setReleaseDate(""); setYear(new Date().getFullYear());
-    setDescription(""); setLyrics(""); setVideoUrl(""); setMediaFile(null); setUploadProgress(0); setStreamingLink("");
+    setDescription(""); setLyrics(""); setVideoUrl(""); setMediaFile(null); setUploadProgress(0); setYoutubeUrl(""); setSpotifyUrl(""); setAudiomackUrl("");
     setCoverFile(null); setCoverPreview(""); setError(""); setOpen(false);
   };
 
@@ -263,8 +265,8 @@ function UploadForm({ onUpload }) {
         setError("Attach a video file, or paste a video link (YouTube, etc.) instead.");
         return;
       }
-    } else if (!mediaFile && !streamingLink.trim()) {
-      setError("Attach a file, or add a YouTube link if you're not uploading the file directly.");
+    } else if (!mediaFile && !youtubeUrl.trim() && !spotifyUrl.trim() && !audiomackUrl.trim()) {
+      setError("Attach a file, or add a YouTube, Spotify or Audiomack link.");
       return;
     }
 
@@ -329,7 +331,10 @@ function UploadForm({ onUpload }) {
         status: "Published",
         views: 0,
         file_url: fileUrl,
-        streaming_link: type === "Audio" ? (streamingLink.trim() || null) : null,
+        streaming_link: null,
+        youtube_url: type === "Audio" ? (youtubeUrl.trim() || null) : null,
+        spotify_url: type === "Audio" ? (spotifyUrl.trim() || null) : null,
+        audiomack_url: type === "Audio" ? (audiomackUrl.trim() || null) : null,
       })
       .select()
       .single();
@@ -454,14 +459,20 @@ function UploadForm({ onUpload }) {
       </div>
 
       {type === "Audio" && (
-        <div className="mb-4">
-          <label className="text-xs text-zinc-500 mb-1.5 block">YouTube link <span className="text-zinc-600">(optional — plays on the song page. Spotify, Apple Music, Audiomack links also work. Add it with or without a file)</span></label>
-          <input
-            value={streamingLink}
-            onChange={e => setStreamingLink(e.target.value)}
-            placeholder="https://www.youtube.com/watch?v=..."
-            className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50"
-          />
+        <div className="mb-4 space-y-3">
+          <p className="text-[11px] text-zinc-600">Platform links (all optional — add the ones you have, with or without a file)</p>
+          <div>
+            <label className="text-xs text-zinc-500 mb-1.5 block">YouTube link <span className="text-zinc-600">(plays on the song page)</span></label>
+            <input value={youtubeUrl} onChange={e => setYoutubeUrl(e.target.value)} placeholder="https://www.youtube.com/watch?v=..." className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50" />
+          </div>
+          <div>
+            <label className="text-xs text-zinc-500 mb-1.5 block">Spotify link</label>
+            <input value={spotifyUrl} onChange={e => setSpotifyUrl(e.target.value)} placeholder="https://open.spotify.com/track/..." className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50" />
+          </div>
+          <div>
+            <label className="text-xs text-zinc-500 mb-1.5 block">Audiomack link</label>
+            <input value={audiomackUrl} onChange={e => setAudiomackUrl(e.target.value)} placeholder="https://audiomack.com/..." className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50" />
+          </div>
         </div>
       )}
 
@@ -488,7 +499,10 @@ function EditContentForm({ item, onSave, onCancel }) {
   const [description, setDescription] = useState(item.description || "");
   const [lyrics, setLyrics] = useState(item.lyrics || "");
   const [videoUrl, setVideoUrl] = useState(item.video_url || "");
-  const [streamingLink, setStreamingLink] = useState(item.streaming_link || "");
+  const legacy = item.streaming_link || "";
+  const [youtubeUrl, setYoutubeUrl] = useState(item.youtube_url || (/youtu\.?be/i.test(legacy) ? legacy : ""));
+  const [spotifyUrl, setSpotifyUrl] = useState(item.spotify_url || (/spotify\.com/i.test(legacy) ? legacy : ""));
+  const [audiomackUrl, setAudiomackUrl] = useState(item.audiomack_url || (/audiomack\.com/i.test(legacy) ? legacy : ""));
   const [coverFile, setCoverFile] = useState(null);
   const [coverPreview, setCoverPreview] = useState(item.cover_url || "");
   const [error, setError] = useState("");
@@ -545,7 +559,10 @@ function EditContentForm({ item, onSave, onCancel }) {
         description: description.trim() || null,
         lyrics: item.type === "Audio" ? (lyrics.trim() || null) : item.lyrics,
         video_url: item.type === "Video" ? (videoUrl.trim() || null) : item.video_url,
-        streaming_link: streamingLink.trim() || null,
+        streaming_link: (!youtubeUrl.trim() && !spotifyUrl.trim() && !audiomackUrl.trim() && legacy && !/youtu\.?be|spotify\.com|audiomack\.com/i.test(legacy)) ? legacy : null,
+        youtube_url: youtubeUrl.trim() || null,
+        spotify_url: spotifyUrl.trim() || null,
+        audiomack_url: audiomackUrl.trim() || null,
         cover_url: coverUrl,
       })
       .eq("id", item.id)
@@ -634,9 +651,19 @@ function EditContentForm({ item, onSave, onCancel }) {
         </div>
       )}
 
-      <div className="mb-4">
-        <label className="text-xs text-zinc-500 mb-1.5 block">YouTube link <span className="text-zinc-600">(optional — plays on the page. Spotify, Apple Music, Audiomack links also work)</span></label>
-        <input value={streamingLink} onChange={e => setStreamingLink(e.target.value)} placeholder="https://www.youtube.com/watch?v=..." className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50" />
+      <div className="mb-4 space-y-3">
+          <div>
+            <label className="text-xs text-zinc-500 mb-1.5 block">YouTube link <span className="text-zinc-600">(plays on the page)</span></label>
+            <input value={youtubeUrl} onChange={e => setYoutubeUrl(e.target.value)} placeholder="https://www.youtube.com/watch?v=..." className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50" />
+          </div>
+          <div>
+            <label className="text-xs text-zinc-500 mb-1.5 block">Spotify link</label>
+            <input value={spotifyUrl} onChange={e => setSpotifyUrl(e.target.value)} placeholder="https://open.spotify.com/track/..." className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50" />
+          </div>
+          <div>
+            <label className="text-xs text-zinc-500 mb-1.5 block">Audiomack link</label>
+            <input value={audiomackUrl} onChange={e => setAudiomackUrl(e.target.value)} placeholder="https://audiomack.com/..." className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50" />
+          </div>
       </div>
 
       <p className="text-[11px] text-zinc-600 mb-4">To replace the audio/video file itself, delete this item and re-upload — editing here only changes the details shown above.</p>
@@ -731,8 +758,8 @@ function ContentTable({ content, setContent }) {
                   <span>{c.type}</span>
                   <span className="font-mono">{formatCount(c.views)} views</span>
                   <span className="font-mono">{c.created_at ? c.created_at.slice(0, 10) : ""}</span>
-                  {c.streaming_link ? (
-                    <a href={c.streaming_link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-amber-400">
+                  {(c.youtube_url || c.spotify_url || c.audiomack_url || c.streaming_link) ? (
+                    <a href={c.youtube_url || c.spotify_url || c.audiomack_url || c.streaming_link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-amber-400">
                       <LinkIcon size={11} /> Streaming link
                     </a>
                   ) : (
@@ -789,8 +816,8 @@ function ContentTable({ content, setContent }) {
                   </td>
                   <td className="px-5 py-3.5 text-zinc-400">{c.type}</td>
                   <td className="px-5 py-3.5">
-                    {c.streaming_link ? (
-                      <a href={c.streaming_link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs text-amber-400 hover:underline">
+                    {(c.youtube_url || c.spotify_url || c.audiomack_url || c.streaming_link) ? (
+                      <a href={c.youtube_url || c.spotify_url || c.audiomack_url || c.streaming_link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs text-amber-400 hover:underline">
                         <LinkIcon size={12} /> Streaming link
                       </a>
                     ) : (
@@ -1365,6 +1392,9 @@ function SubmissionsManager({ submissions, setSubmissions, content, setContent, 
           cover_url: s.cover_url || null,
           file_url: s.file_url || null,
           streaming_link: s.streaming_link || null,
+          youtube_url: s.youtube_url || null,
+          spotify_url: s.spotify_url || null,
+          audiomack_url: s.audiomack_url || null,
           status: "Published",
           views: 0,
         })
@@ -1464,8 +1494,8 @@ function SubmissionsManager({ submissions, setSubmissions, content, setContent, 
                       ) : s.type === "song" ? (
                         <audio src={s.file_url} controls preload="none" className="w-full max-w-xs" />
                       ) : null
-                    ) : s.streaming_link ? (
-                      <a href={s.streaming_link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs text-amber-400 hover:underline">
+                    ) : (s.youtube_url || s.spotify_url || s.audiomack_url || s.streaming_link) ? (
+                      <a href={s.youtube_url || s.spotify_url || s.audiomack_url || s.streaming_link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs text-amber-400 hover:underline">
                         <LinkIcon size={12} /> Streaming link
                       </a>
                     ) : s.type === "gist" ? (
