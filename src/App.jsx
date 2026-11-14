@@ -264,7 +264,7 @@ function UploadForm({ onUpload }) {
         return;
       }
     } else if (!mediaFile && !streamingLink.trim()) {
-      setError("Attach a file, or add a streaming link if you're not uploading the file directly.");
+      setError("Attach a file, or add a YouTube link if you're not uploading the file directly.");
       return;
     }
 
@@ -455,11 +455,11 @@ function UploadForm({ onUpload }) {
 
       {type === "Audio" && (
         <div className="mb-4">
-          <label className="text-xs text-zinc-500 mb-1.5 block">Streaming link <span className="text-zinc-600">(optional — Spotify, Apple Music, YouTube, Audiomack, etc. Add it with or without a file)</span></label>
+          <label className="text-xs text-zinc-500 mb-1.5 block">YouTube link <span className="text-zinc-600">(optional — plays on the song page. Spotify, Apple Music, Audiomack links also work. Add it with or without a file)</span></label>
           <input
             value={streamingLink}
             onChange={e => setStreamingLink(e.target.value)}
-            placeholder="https://open.spotify.com/track/..."
+            placeholder="https://www.youtube.com/watch?v=..."
             className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50"
           />
         </div>
@@ -635,8 +635,8 @@ function EditContentForm({ item, onSave, onCancel }) {
       )}
 
       <div className="mb-4">
-        <label className="text-xs text-zinc-500 mb-1.5 block">Streaming link <span className="text-zinc-600">(optional — shown next to Play and Download)</span></label>
-        <input value={streamingLink} onChange={e => setStreamingLink(e.target.value)} placeholder="https://open.spotify.com/track/..." className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50" />
+        <label className="text-xs text-zinc-500 mb-1.5 block">YouTube link <span className="text-zinc-600">(optional — plays on the page. Spotify, Apple Music, Audiomack links also work)</span></label>
+        <input value={streamingLink} onChange={e => setStreamingLink(e.target.value)} placeholder="https://www.youtube.com/watch?v=..." className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50" />
       </div>
 
       <p className="text-[11px] text-zinc-600 mb-4">To replace the audio/video file itself, delete this item and re-upload — editing here only changes the details shown above.</p>
