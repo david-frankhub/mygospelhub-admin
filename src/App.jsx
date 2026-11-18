@@ -226,6 +226,7 @@ function UploadForm({ onUpload }) {
   const [youtubeUrl, setYoutubeUrl] = useState("");
   const [spotifyUrl, setSpotifyUrl] = useState("");
   const [audiomackUrl, setAudiomackUrl] = useState("");
+  const [fanUrl, setFanUrl] = useState("");
   const [coverFile, setCoverFile] = useState(null);
   const [coverPreview, setCoverPreview] = useState("");
   const [error, setError] = useState("");
@@ -233,7 +234,7 @@ function UploadForm({ onUpload }) {
 
   const reset = () => {
     setTitle(""); setArtist(""); setGenre("Worship"); setProducer(""); setUploadedBy("MyGospelHub"); setReleaseDate(""); setYear(new Date().getFullYear());
-    setDescription(""); setLyrics(""); setVideoUrl(""); setMediaFile(null); setUploadProgress(0); setYoutubeUrl(""); setSpotifyUrl(""); setAudiomackUrl("");
+    setDescription(""); setLyrics(""); setVideoUrl(""); setMediaFile(null); setUploadProgress(0); setYoutubeUrl(""); setSpotifyUrl(""); setAudiomackUrl(""); setFanUrl("");
     setCoverFile(null); setCoverPreview(""); setError(""); setOpen(false);
   };
 
@@ -265,8 +266,8 @@ function UploadForm({ onUpload }) {
         setError("Attach a video file, or paste a video link (YouTube, etc.) instead.");
         return;
       }
-    } else if (!mediaFile && !youtubeUrl.trim() && !spotifyUrl.trim() && !audiomackUrl.trim()) {
-      setError("Attach a file, or add a YouTube, Spotify or Audiomack link.");
+    } else if (!mediaFile && !youtubeUrl.trim() && !spotifyUrl.trim() && !audiomackUrl.trim() && !fanUrl.trim()) {
+      setError("Attach a file, or add a YouTube, Spotify, Audiomack or fan link.");
       return;
     }
 
@@ -331,7 +332,7 @@ function UploadForm({ onUpload }) {
         status: "Published",
         views: 0,
         file_url: fileUrl,
-        streaming_link: null,
+        streaming_link: type === "Audio" ? (fanUrl.trim() || null) : null,
         youtube_url: type === "Audio" ? (youtubeUrl.trim() || null) : null,
         spotify_url: type === "Audio" ? (spotifyUrl.trim() || null) : null,
         audiomack_url: type === "Audio" ? (audiomackUrl.trim() || null) : null,
@@ -473,6 +474,11 @@ function UploadForm({ onUpload }) {
             <label className="text-xs text-zinc-500 mb-1.5 block">Audiomack link</label>
             <input value={audiomackUrl} onChange={e => setAudiomackUrl(e.target.value)} placeholder="https://audiomack.com/..." className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50" />
           </div>
+          <div>
+            <label className="text-xs text-zinc-500 mb-1.5 block">Fan link (all platforms)</label>
+            <input value={fanUrl} onChange={e => setFanUrl(e.target.value)} placeholder="https://ffm.to/... or any smart link" className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50" />
+            <p className="text-[11px] text-zinc-600 mt-1">Shows a "Stream everywhere" card that opens this link.</p>
+          </div>
         </div>
       )}
 
@@ -503,6 +509,7 @@ function EditContentForm({ item, onSave, onCancel }) {
   const [youtubeUrl, setYoutubeUrl] = useState(item.youtube_url || (/youtu\.?be/i.test(legacy) ? legacy : ""));
   const [spotifyUrl, setSpotifyUrl] = useState(item.spotify_url || (/spotify\.com/i.test(legacy) ? legacy : ""));
   const [audiomackUrl, setAudiomackUrl] = useState(item.audiomack_url || (/audiomack\.com/i.test(legacy) ? legacy : ""));
+  const [fanUrl, setFanUrl] = useState(legacy && !/youtu\.?be|spotify\.com|audiomack\.com/i.test(legacy) ? legacy : "");
   const [coverFile, setCoverFile] = useState(null);
   const [coverPreview, setCoverPreview] = useState(item.cover_url || "");
   const [error, setError] = useState("");
@@ -559,7 +566,7 @@ function EditContentForm({ item, onSave, onCancel }) {
         description: description.trim() || null,
         lyrics: item.type === "Audio" ? (lyrics.trim() || null) : item.lyrics,
         video_url: item.type === "Video" ? (videoUrl.trim() || null) : item.video_url,
-        streaming_link: (!youtubeUrl.trim() && !spotifyUrl.trim() && !audiomackUrl.trim() && legacy && !/youtu\.?be|spotify\.com|audiomack\.com/i.test(legacy)) ? legacy : null,
+        streaming_link: fanUrl.trim() || null,
         youtube_url: youtubeUrl.trim() || null,
         spotify_url: spotifyUrl.trim() || null,
         audiomack_url: audiomackUrl.trim() || null,
@@ -663,6 +670,11 @@ function EditContentForm({ item, onSave, onCancel }) {
           <div>
             <label className="text-xs text-zinc-500 mb-1.5 block">Audiomack link</label>
             <input value={audiomackUrl} onChange={e => setAudiomackUrl(e.target.value)} placeholder="https://audiomack.com/..." className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50" />
+          </div>
+          <div>
+            <label className="text-xs text-zinc-500 mb-1.5 block">Fan link (all platforms)</label>
+            <input value={fanUrl} onChange={e => setFanUrl(e.target.value)} placeholder="https://ffm.to/... or any smart link" className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50" />
+            <p className="text-[11px] text-zinc-600 mt-1">Shows a "Stream everywhere" card that opens this link.</p>
           </div>
       </div>
 
