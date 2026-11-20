@@ -511,6 +511,8 @@ function EditContentForm({ item, onSave, onCancel }) {
   const [audiomackUrl, setAudiomackUrl] = useState(item.audiomack_url || (/audiomack\.com/i.test(legacy) ? legacy : ""));
   const [fanUrl, setFanUrl] = useState(legacy && !/youtu\.?be|spotify\.com|audiomack\.com/i.test(legacy) ? legacy : "");
   const [coverFile, setCoverFile] = useState(null);
+  const [mediaFile, setMediaFile] = useState(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [coverPreview, setCoverPreview] = useState(item.cover_url || "");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -520,6 +522,11 @@ function EditContentForm({ item, onSave, onCancel }) {
     if (!file) return;
     setCoverFile(file);
     setCoverPreview(URL.createObjectURL(file));
+  };
+
+  const handleMediaSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (file) setMediaFile(file);
   };
 
   const save = async () => {
@@ -553,6 +560,24 @@ function EditContentForm({ item, onSave, onCancel }) {
       coverUrl = urlData.publicUrl;
     }
 
+    // Only replace the audio/video file if a new one was picked
+    let fileUrl = item.file_url || null;
+    if (mediaFile) {
+      const ext = mediaFile.name.split(".").pop();
+      const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      setUploadProgress(10);
+      const { error: mediaError } = await supabase.storage.from("media").upload(path, mediaFile);
+      if (mediaError) {
+        setError("File upload failed: " + mediaError.message);
+        setSaving(false);
+        setUploadProgress(0);
+        return;
+      }
+      setUploadProgress(100);
+      const { data: mediaUrlData } = supabase.storage.from("media").getPublicUrl(path);
+      fileUrl = mediaUrlData.publicUrl;
+    }
+
     const { data, error: updateError } = await supabase
       .from("content")
       .update({
@@ -571,6 +596,7 @@ function EditContentForm({ item, onSave, onCancel }) {
         spotify_url: spotifyUrl.trim() || null,
         audiomack_url: audiomackUrl.trim() || null,
         cover_url: coverUrl,
+        file_url: fileUrl,
       })
       .eq("id", item.id)
       .select()
@@ -647,6 +673,29 @@ function EditContentForm({ item, onSave, onCancel }) {
       </div>
 
       <div className="mb-4">
+        <label className="text-xs text-zinc-500 mb-1.5 block">
+          {item.type === "Video" ? "Video file" : "Audio file"}{" "}
+          <span className="text-zinc-600">{item.file_url ? "(a file is already uploaded — choose a new one to replace it)" : "(none uploaded yet)"}</span>
+        </label>
+        <label
+          className={`w-full border rounded-lg px-3 py-2 text-sm flex items-center gap-2 transition-colors cursor-pointer ${
+            mediaFile ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" : "bg-zinc-950 border-dashed border-zinc-800 text-zinc-500 hover:border-zinc-700"
+          }`}
+        >
+          {mediaFile ? <Check size={14} /> : <Upload size={14} />}
+          <span className="truncate">
+            {mediaFile ? `${mediaFile.name} (${(mediaFile.size / (1024 * 1024)).toFixed(1)} MB)` : item.file_url ? "Tap to replace the file" : "Tap to choose an audio or video file"}
+          </span>
+          <input type="file" accept={item.type === "Audio" ? "audio/*" : "video/*"} onChange={handleMediaSelect} className="hidden" />
+        </label>
+        {saving && mediaFile && (
+          <div className="mt-2 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+            <div className="h-full bg-amber-500 transition-all" style={{ width: `${uploadProgress}%` }}></div>
+          </div>
+        )}
+      </div>
+
+      <div className="mb-4">
         <label className="text-xs text-zinc-500 mb-1.5 block">Description</label>
         <textarea value={description} onChange={e => setDescription(e.target.value)} rows={2} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50 resize-none" />
       </div>
@@ -687,7 +736,7 @@ function EditContentForm({ item, onSave, onCancel }) {
       <div className="flex gap-2">
         <button onClick={save} disabled={saving} className="bg-amber-500 hover:bg-amber-400 disabled:opacity-60 text-zinc-950 text-sm font-semibold px-4 py-2.5 rounded-lg transition-colors flex items-center gap-2">
           {saving && <Loader2 size={14} className="animate-spin" />}
-          {saving ? "Saving..." : "Save changes"}
+          {saving ? (mediaFile ? "Uploading file..." : "Saving...") : "Save changes"}
         </button>
         <button onClick={onCancel} className="text-zinc-400 hover:text-zinc-200 text-sm font-medium px-4 py-2.5">Cancel</button>
       </div>
