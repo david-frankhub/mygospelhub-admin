@@ -1058,6 +1058,46 @@ function GistManager({ gist, setGist }) {
   const [body, setBody] = useState("");
   const [coverFile, setCoverFile] = useState(null);
   const [coverPreview, setCoverPreview] = useState("");
+  const [coverUrlPick, setCoverUrlPick] = useState("");
+  const [artistQ, setArtistQ] = useState("");
+  const [artistCovers, setArtistCovers] = useState([]);
+  const [artistMsg, setArtistMsg] = useState("");
+
+  const makeBrandedCover = () => {
+    const W = 1200, H = 630;
+    const c = document.createElement("canvas"); c.width = W; c.height = H;
+    const g = c.getContext("2d");
+    const grad = g.createLinearGradient(0, 0, W, H);
+    grad.addColorStop(0, "#1c1917"); grad.addColorStop(0.6, "#27272a"); grad.addColorStop(1, "#78350f");
+    g.fillStyle = grad; g.fillRect(0, 0, W, H);
+    g.fillStyle = "rgba(245,158,11,0.12)"; g.beginPath(); g.arc(1050, 120, 260, 0, Math.PI * 2); g.fill();
+    g.fillStyle = "#f59e0b"; g.fillRect(70, 90, 8, 360);
+    g.font = "600 26px Georgia, serif"; g.fillStyle = "#f59e0b";
+    g.fillText((category || "News").toUpperCase(), 110, 120);
+    g.fillStyle = "#fafafa"; g.font = "700 62px Georgia, serif";
+    const words = (title || "MyGospelHub").split(" "); const lines = []; let line = "";
+    for (const w of words) { const t = line ? line + " " + w : w; if (g.measureText(t).width > 980 && line) { lines.push(line); line = w; } else line = t; }
+    lines.push(line);
+    lines.slice(0, 4).forEach((l, i) => g.fillText(l + (i === 3 && lines.length > 4 ? "…" : ""), 110, 215 + i * 78));
+    g.font = "600 30px Georgia, serif"; g.fillStyle = "#d4d4d8"; g.fillText("MyGospelHub", 70, 560);
+    c.toBlob((blob) => {
+      if (!blob) return;
+      const f = new File([blob], "cover.png", { type: "image/png" });
+      setCoverUrlPick(""); setCoverFile(f); setCoverPreview(URL.createObjectURL(f));
+    }, "image/png");
+  };
+
+  const searchArtistCovers = async () => {
+    setArtistMsg(""); setArtistCovers([]);
+    const q = artistQ.trim().replace(/[%,()]/g, "");
+    if (q.length < 2) { setArtistMsg("Type the artiste name."); return; }
+    const { data } = await supabase.from("content").select("cover_url,artist,title").ilike("artist", `%${q}%`).not("cover_url", "is", null).limit(12);
+    const seen = new Set(); const list = (data || []).filter(r => r.cover_url && !seen.has(r.cover_url) && seen.add(r.cover_url));
+    setArtistCovers(list);
+    if (!list.length) setArtistMsg("No covers for that artiste on your site yet.");
+  };
+
+  const pickArtistCover = (url) => { setCoverFile(null); setCoverUrlPick(url); setCoverPreview(url); setArtistCovers([]); };
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [aiFacts, setAiFacts] = useState("");
@@ -1122,13 +1162,13 @@ function GistManager({ gist, setGist }) {
 
   const resetForm = () => {
     setAiFacts(""); setMetaDesc(""); setActiveLead(null); setTitle(""); setCategory("Community"); setUploadedBy("MyGospelHub"); setBody("");
-    setCoverFile(null); setCoverPreview(""); setError(""); setOpen(false);
+    setCoverFile(null); setCoverPreview(""); setCoverUrlPick(""); setArtistQ(""); setArtistCovers([]); setArtistMsg(""); setError(""); setOpen(false);
   };
 
   const handleCoverSelect = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setCoverFile(file);
+    setCoverUrlPick(""); setCoverFile(file);
     setCoverPreview(URL.createObjectURL(file));
   };
 
@@ -1144,7 +1184,7 @@ function GistManager({ gist, setGist }) {
     }
     setSubmitting(true);
 
-    let coverUrl = null;
+    let coverUrl = coverUrlPick || null;
     if (coverFile) {
       let jpegFile;
       try {
@@ -1259,6 +1299,7 @@ function GistManager({ gist, setGist }) {
                 )}
                 <input type="file" accept="image/*" onChange={handleCoverSelect} className="hidden" />
               </label>
+              <button type="button" onClick={makeBrandedCover} className="mt-2 w-24 text-[11px] border border-amber-500/40 text-amber-400 rounded-lg py-1.5">Auto cover</button>
             </div>
             <div className="flex-1 grid grid-cols-3 gap-4">
               <div className="col-span-2">
@@ -1288,6 +1329,19 @@ function GistManager({ gist, setGist }) {
               <div className="col-span-3">
                 <label className="text-xs text-zinc-500 mb-1.5 block">Posted by <span className="text-zinc-600">(shown as "By ...")</span></label>
                 <input value={uploadedBy} onChange={e => setUploadedBy(e.target.value)} placeholder="MyGospelHub" className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50" />
+              </div>
+              <div className="col-span-3">
+                <label className="text-xs text-zinc-500 mb-1.5 block">Cover from your site <span className="text-zinc-600">(artiste name → covers you already uploaded)</span></label>
+                <div className="flex gap-2">
+                  <input value={artistQ} onChange={e => setArtistQ(e.target.value)} placeholder="e.g. Mercy Chinwo" className="flex-1 bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50" />
+                  <button type="button" onClick={searchArtistCovers} className="text-xs border border-zinc-700 text-zinc-300 rounded-lg px-3">Find</button>
+                </div>
+                {artistMsg && <p className="text-xs text-zinc-500 mt-1">{artistMsg}</p>}
+                {artistCovers.length > 0 && (
+                  <div className="flex gap-2 mt-2 overflow-x-auto">
+                    {artistCovers.map(r => <img key={r.cover_url} src={r.cover_url} alt={r.title} title={r.title} onClick={() => pickArtistCover(r.cover_url)} className="w-16 h-16 rounded-lg object-cover cursor-pointer border border-zinc-800 hover:border-amber-500 shrink-0" />)}
+                  </div>
+                )}
               </div>
               <div className="col-span-3 rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
                 <label className="text-xs text-amber-400 mb-1.5 block">AI draft helper <span className="text-zinc-500">(free) — paste facts or notes; it writes a draft you must check before publishing</span></label>
