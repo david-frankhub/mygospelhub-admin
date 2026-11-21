@@ -1064,7 +1064,7 @@ function loadCoverImage(src) {
 async function composeCover({ src, title, category, caption, format }) {
   const { w: W, h: H } = COVER_FORMATS[format] || COVER_FORMATS.post;
   const wide = format === "wide";
-  try { await Promise.all([document.fonts.load("100px Anton"), document.fonts.load("700 40px Fraunces")]); } catch (e) { /* fonts optional */ }
+  try { await Promise.all([document.fonts.load("600 100px Oswald"), document.fonts.load("700 40px Fraunces")]); } catch (e) { /* fonts optional */ }
   const c = document.createElement("canvas"); c.width = W; c.height = H;
   const g = c.getContext("2d");
   const GOLD = "#D9A441";
@@ -1081,7 +1081,7 @@ async function composeCover({ src, title, category, caption, format }) {
   }
   // shading
   const bot = g.createLinearGradient(0, H * 0.35, 0, H);
-  bot.addColorStop(0, "rgba(0,0,0,0)"); bot.addColorStop(0.55, "rgba(0,0,0,0.78)"); bot.addColorStop(1, "rgba(0,0,0,0.95)");
+  bot.addColorStop(0, "rgba(0,0,0,0)"); bot.addColorStop(0.55, "rgba(0,0,0,0.66)"); bot.addColorStop(1, "rgba(0,0,0,0.88)");
   g.fillStyle = bot; g.fillRect(0, 0, W, H);
   const top = g.createLinearGradient(0, 0, 0, H * 0.24);
   top.addColorStop(0, "rgba(0,0,0,0.7)"); top.addColorStop(1, "rgba(0,0,0,0)");
@@ -1096,7 +1096,7 @@ async function composeCover({ src, title, category, caption, format }) {
   const lw = g.measureText("MyGospelHub").width;
   g.fillStyle = GOLD; g.fillText(".", padX + lw, H * (wide ? 0.13 : 0.075));
   const pillText = (category || "News").toUpperCase();
-  g.font = `${wide ? 20 : 28}px Anton, Impact, sans-serif`;
+  g.font = `500 ${wide ? 19 : 26}px Oswald, Anton, Impact, sans-serif`;
   const pw = g.measureText(pillText).width + 30, ph = wide ? 34 : 48;
   const px = padX + lw + (wide ? 36 : 50), py = H * (wide ? 0.13 : 0.075) - ph * 0.78;
   g.fillStyle = GOLD; g.fillRect(px, py, pw, ph);
@@ -1108,9 +1108,9 @@ async function composeCover({ src, title, category, caption, format }) {
   t = t.replace(/^["“‘']+|["”’']+$/g, "").toUpperCase();
   const words = t.split(/\s+/).filter(Boolean);
   const maxW = W - padX * 2, maxLines = wide ? 3 : 4;
-  let size = wide ? 76 : 128, lines = [];
+  let size = wide ? 58 : 98, lines = [];
   const wrap = () => {
-    g.font = `${size}px Anton, Impact, "Arial Black", sans-serif`;
+    g.font = `600 ${size}px Oswald, Anton, Impact, sans-serif`;
     const out = []; let line = [];
     for (const w of words) {
       const test = [...line, w].join(" ");
@@ -1120,7 +1120,7 @@ async function composeCover({ src, title, category, caption, format }) {
   };
   lines = wrap();
   while ((lines.length > maxLines || lines.some(l => g.measureText(l.join(" ")).width > maxW)) && size > 28) { size -= 4; lines = wrap(); }
-  const lineH = size * 1.08;
+  const lineH = size * 1.14;
   const capBottom = H * (wide ? 0.9 : 0.915);
   const hasCap = !!(caption || "").trim();
   const blockBottom = capBottom - (hasCap ? (wide ? 56 : 84) : 24);
@@ -1134,7 +1134,7 @@ async function composeCover({ src, title, category, caption, format }) {
       const isAccent = !accentDone && w === accent && accent.length >= 4;
       if (isAccent) accentDone = true;
       g.fillStyle = isAccent ? GOLD : "#ffffff";
-      g.shadowColor = "rgba(0,0,0,0.5)"; g.shadowBlur = 12;
+      g.shadowColor = "rgba(0,0,0,0.4)"; g.shadowBlur = 8;
       g.fillText(w, x, y);
       g.shadowBlur = 0;
       x += g.measureText(w + " ").width;
@@ -1142,16 +1142,16 @@ async function composeCover({ src, title, category, caption, format }) {
   });
   // quote mark
   if (hasQuote) {
-    g.fillStyle = GOLD; g.font = `${size * 1.3}px Anton, Georgia, serif`;
+    g.fillStyle = GOLD; g.font = `600 ${size * 1.3}px Oswald, Georgia, serif`;
     g.fillText("\u201C", padX - 2, blockBottom - (lines.length - 1) * lineH - size * 0.95);
   }
   // underline stroke
-  g.strokeStyle = GOLD; g.lineWidth = wide ? 6 : 10; g.lineCap = "round";
+  g.strokeStyle = GOLD; g.lineWidth = wide ? 5 : 8; g.lineCap = "round";
   g.beginPath(); g.moveTo(padX, blockBottom + (wide ? 22 : 30)); g.quadraticCurveTo(W * 0.35, blockBottom + (wide ? 16 : 22), W * 0.62, blockBottom + (wide ? 20 : 26)); g.stroke();
   // caption
   if (hasCap) {
     g.fillStyle = GOLD; g.fillRect(padX, capBottom - (wide ? 22 : 32), 5, wide ? 28 : 40);
-    g.fillStyle = "#e4e4e7"; g.font = `${wide ? 22 : 32}px Anton, Impact, sans-serif`;
+    g.fillStyle = "#e4e4e7"; g.font = `500 ${wide ? 20 : 28}px Oswald, Anton, Impact, sans-serif`;
     try { g.letterSpacing = "3px"; } catch (e) { /* older browsers */ }
     g.fillText(caption.trim().toUpperCase().slice(0, 60), padX + 20, capBottom);
     try { g.letterSpacing = "0px"; } catch (e) { /* ignore */ }
