@@ -1062,6 +1062,43 @@ function GistManager({ gist, setGist }) {
   const [submitting, setSubmitting] = useState(false);
   const [aiFacts, setAiFacts] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
+  const [metaDesc, setMetaDesc] = useState("");
+  const [leads, setLeads] = useState([]);
+  const [leadsOpen, setLeadsOpen] = useState(false);
+  const [leadsBusy, setLeadsBusy] = useState(false);
+  const [leadsMsg, setLeadsMsg] = useState("");
+  const [activeLead, setActiveLead] = useState(null);
+
+  const loadLeads = async () => {
+    const { data } = await supabase.from("ai_leads").select("*").eq("status", "new").order("published_at", { ascending: false, nullsFirst: false }).limit(60);
+    setLeads(data || []);
+  };
+  useEffect(() => { loadLeads(); }, []);
+
+  const fetchLeadsNow = async () => {
+    setLeadsBusy(true); setLeadsMsg("");
+    try {
+      const { data: sess } = await supabase.auth.getSession();
+      const res = await fetch("https://mygospelhub.com.ng/api/ai/fetch-leads", { method: "POST", headers: { Authorization: `Bearer ${sess?.session?.access_token || ""}` } });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.error || "Failed");
+      setLeadsMsg(d.added ? `${d.added} new leads found.` : "No new leads right now.");
+      await loadLeads();
+    } catch (e) { setLeadsMsg("Could not fetch: " + e.message); }
+    setLeadsBusy(false);
+  };
+
+  const dismissLead = async (id) => {
+    setLeads(leads.filter(l => l.id !== id));
+    await supabase.from("ai_leads").update({ status: "dismissed" }).eq("id", id);
+  };
+
+  const draftFromLead = (l) => {
+    setActiveLead(l.id);
+    setAiFacts(`Headline from source: ${l.title}\nSource: ${l.source || "unknown"} (${l.url})\nSummary: ${l.snippet || ""}\n\nAdd more facts here from the source article (open the link, read it, and paste the key facts in your own notes):\n`);
+    setOpen(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   const generateWithAI = async () => {
     setError("");
@@ -1076,7 +1113,7 @@ function GistManager({ gist, setGist }) {
       });
       const d = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(d.error || "AI request failed.");
-      setTitle(d.title || ""); setCategory(d.category || "General"); setBody(d.body || "");
+      setTitle(d.title || ""); setCategory(d.category || "General"); setBody(d.body || ""); setMetaDesc(d.meta_description || "");
     } catch (e) {
       setError("AI: " + e.message);
     }
@@ -1084,7 +1121,7 @@ function GistManager({ gist, setGist }) {
   };
 
   const resetForm = () => {
-    setAiFacts(""); setTitle(""); setCategory("Community"); setUploadedBy("MyGospelHub"); setBody("");
+    setAiFacts(""); setMetaDesc(""); setActiveLead(null); setTitle(""); setCategory("Community"); setUploadedBy("MyGospelHub"); setBody("");
     setCoverFile(null); setCoverPreview(""); setError(""); setOpen(false);
   };
 
@@ -1130,7 +1167,7 @@ function GistManager({ gist, setGist }) {
 
     const { data, error: insertError } = await supabase
       .from("gist_articles")
-      .insert({ title: title.trim(), category, uploaded_by: uploadedBy.trim(), body: body.trim() || null, cover_url: coverUrl, status: "Draft", reads: 0 })
+      .insert({ title: title.trim(), category, uploaded_by: uploadedBy.trim(), body: body.trim() || null, meta_description: metaDesc.trim() || null, cover_url: coverUrl, status: "Draft", reads: 0 })
       .select()
       .single();
     setSubmitting(false);
@@ -1140,6 +1177,7 @@ function GistManager({ gist, setGist }) {
       return;
     }
     setGist([data, ...gist]);
+    if (activeLead) { await supabase.from("ai_leads").update({ status: "drafted" }).eq("id", activeLead); setLeads(leads.filter(l => l.id !== activeLead)); }
     resetForm();
   };
 
@@ -1183,6 +1221,30 @@ function GistManager({ gist, setGist }) {
           />
         );
       })()}
+
+      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 mb-5">
+        <div className="flex items-center justify-between gap-3">
+          <button onClick={() => setLeadsOpen(!leadsOpen)} className="text-sm font-semibold text-zinc-100 text-left">News leads (AI inbox) <span className="ml-1 text-xs bg-amber-500 text-zinc-950 rounded-full px-2 py-0.5">{leads.length}</span></button>
+          <button onClick={fetchLeadsNow} disabled={leadsBusy} className="text-xs border border-zinc-700 text-zinc-300 hover:border-amber-500/50 rounded-lg px-3 py-1.5 disabled:opacity-60">{leadsBusy ? "Searching..." : "Fetch now"}</button>
+        </div>
+        {leadsMsg && <p className="text-xs text-zinc-500 mt-2">{leadsMsg}</p>}
+        {leadsOpen && (
+          <div className="mt-3 space-y-2 max-h-96 overflow-y-auto">
+            {leads.length === 0 && <p className="text-xs text-zinc-500">No leads yet. Tap Fetch now, or wait for the daily search.</p>}
+            {leads.map(l => (
+              <div key={l.id} className="border border-zinc-800 rounded-lg p-3">
+                <p className="text-sm text-zinc-100">{l.title}</p>
+                <p className="text-xs text-zinc-500 mt-0.5">{l.source || "Source"} {l.published_at ? "· " + timeAgo(l.published_at) : ""}</p>
+                <div className="flex gap-2 mt-2 flex-wrap">
+                  <a href={l.url} target="_blank" rel="noreferrer" className="text-xs border border-zinc-700 text-zinc-300 rounded-lg px-3 py-1.5">Read source</a>
+                  <button onClick={() => draftFromLead(l)} className="text-xs bg-amber-500 text-zinc-950 font-semibold rounded-lg px-3 py-1.5">Draft this</button>
+                  <button onClick={() => dismissLead(l.id)} className="text-xs text-zinc-500 px-2 py-1.5">Dismiss</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {open && (
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 mb-6">
@@ -1235,6 +1297,10 @@ function GistManager({ gist, setGist }) {
               <div className="col-span-3">
                 <label className="text-xs text-zinc-500 mb-1.5 block">Article body</label>
                 <textarea value={body} onChange={e => setBody(e.target.value)} placeholder="Write the full story here..." rows={5} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50 resize-none" />
+              </div>
+              <div className="col-span-3">
+                <label className="text-xs text-zinc-500 mb-1.5 block">Google description <span className="text-zinc-600">(SEO, max 160 characters — AI fills this)</span> <span className="text-zinc-600">{metaDesc.length}/160</span></label>
+                <input value={metaDesc} maxLength={160} onChange={e => setMetaDesc(e.target.value)} placeholder="Short summary shown in Google results" className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50" />
               </div>
             </div>
           </div>
