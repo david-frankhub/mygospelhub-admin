@@ -1112,7 +1112,7 @@ function GistManager({ gist, setGist }) {
         body: JSON.stringify({ facts: aiFacts }),
       });
       const d = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(d.error || "AI request failed.");
+      if (!res.ok) throw new Error((d.error || "AI request failed.") + (d.debug ? " [" + d.debug.slice(0, 120) + "]" : ""));
       setTitle(d.title || ""); setCategory(d.category || "General"); setBody(d.body || ""); setMetaDesc(d.meta_description || "");
     } catch (e) {
       setError("AI: " + e.message);
