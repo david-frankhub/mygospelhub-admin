@@ -1049,6 +1049,116 @@ function EditGistForm({ item, onSave, onCancel }) {
   );
 }
 
+// ---------- Cover composer: photo + headline + MyGospelHub logo (canvas) ----------
+const COVER_FORMATS = { post: { w: 1080, h: 1350, label: "Post 4:5" }, wide: { w: 1200, h: 630, label: "Wide link preview" } };
+function loadCoverImage(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    if (typeof src === "string") img.crossOrigin = "anonymous";
+    const url = typeof src === "string" ? src : URL.createObjectURL(src);
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("could not load the image"));
+    img.src = url;
+  });
+}
+async function composeCover({ src, title, category, caption, format }) {
+  const { w: W, h: H } = COVER_FORMATS[format] || COVER_FORMATS.post;
+  const wide = format === "wide";
+  try { await Promise.all([document.fonts.load("100px Anton"), document.fonts.load("700 40px Fraunces")]); } catch (e) { /* fonts optional */ }
+  const c = document.createElement("canvas"); c.width = W; c.height = H;
+  const g = c.getContext("2d");
+  const GOLD = "#D9A441";
+  // background
+  if (src) {
+    const img = await loadCoverImage(src);
+    const sc = Math.max(W / img.width, H / img.height);
+    g.drawImage(img, (W - img.width * sc) / 2, (H - img.height * sc) * 0.2, img.width * sc, img.height * sc);
+  } else {
+    const bg = g.createLinearGradient(0, 0, W, H);
+    bg.addColorStop(0, "#0B0B0D"); bg.addColorStop(0.65, "#1c1917"); bg.addColorStop(1, "#78350f");
+    g.fillStyle = bg; g.fillRect(0, 0, W, H);
+    g.fillStyle = "rgba(217,164,65,0.14)"; g.beginPath(); g.arc(W * 0.86, H * 0.18, H * 0.3, 0, Math.PI * 2); g.fill();
+  }
+  // shading
+  const bot = g.createLinearGradient(0, H * 0.35, 0, H);
+  bot.addColorStop(0, "rgba(0,0,0,0)"); bot.addColorStop(0.55, "rgba(0,0,0,0.78)"); bot.addColorStop(1, "rgba(0,0,0,0.95)");
+  g.fillStyle = bot; g.fillRect(0, 0, W, H);
+  const top = g.createLinearGradient(0, 0, 0, H * 0.24);
+  top.addColorStop(0, "rgba(0,0,0,0.7)"); top.addColorStop(1, "rgba(0,0,0,0)");
+  g.fillStyle = top; g.fillRect(0, 0, W, H * 0.24);
+
+  const padX = W * 0.07;
+  // logo + category pill (top-left)
+  const logoSize = wide ? 38 : 54;
+  g.textBaseline = "alphabetic";
+  g.font = `700 ${logoSize}px Fraunces, Georgia, serif`;
+  g.fillStyle = "#ffffff"; g.fillText("MyGospelHub", padX, H * (wide ? 0.13 : 0.075));
+  const lw = g.measureText("MyGospelHub").width;
+  g.fillStyle = GOLD; g.fillText(".", padX + lw, H * (wide ? 0.13 : 0.075));
+  const pillText = (category || "News").toUpperCase();
+  g.font = `${wide ? 20 : 28}px Anton, Impact, sans-serif`;
+  const pw = g.measureText(pillText).width + 30, ph = wide ? 34 : 48;
+  const px = padX + lw + (wide ? 36 : 50), py = H * (wide ? 0.13 : 0.075) - ph * 0.78;
+  g.fillStyle = GOLD; g.fillRect(px, py, pw, ph);
+  g.fillStyle = "#0B0B0D"; g.fillText(pillText, px + 15, py + ph * 0.76);
+
+  // headline
+  let t = (title || "MyGospelHub").trim();
+  const hasQuote = /^["“‘']/.test(t);
+  t = t.replace(/^["“‘']+|["”’']+$/g, "").toUpperCase();
+  const words = t.split(/\s+/).filter(Boolean);
+  const maxW = W - padX * 2, maxLines = wide ? 3 : 4;
+  let size = wide ? 76 : 128, lines = [];
+  const wrap = () => {
+    g.font = `${size}px Anton, Impact, "Arial Black", sans-serif`;
+    const out = []; let line = [];
+    for (const w of words) {
+      const test = [...line, w].join(" ");
+      if (g.measureText(test).width > maxW && line.length) { out.push(line); line = [w]; } else line.push(w);
+    }
+    out.push(line); return out;
+  };
+  lines = wrap();
+  while ((lines.length > maxLines || lines.some(l => g.measureText(l.join(" ")).width > maxW)) && size > 28) { size -= 4; lines = wrap(); }
+  const lineH = size * 1.08;
+  const capBottom = H * (wide ? 0.9 : 0.915);
+  const hasCap = !!(caption || "").trim();
+  const blockBottom = capBottom - (hasCap ? (wide ? 56 : 84) : 24);
+  // accent word = longest word
+  const accent = words.reduce((a, b) => (b.length > a.length ? b : a), "");
+  let accentDone = false;
+  lines.forEach((l, i) => {
+    const y = blockBottom - (lines.length - 1 - i) * lineH;
+    let x = padX;
+    l.forEach((w) => {
+      const isAccent = !accentDone && w === accent && accent.length >= 4;
+      if (isAccent) accentDone = true;
+      g.fillStyle = isAccent ? GOLD : "#ffffff";
+      g.shadowColor = "rgba(0,0,0,0.5)"; g.shadowBlur = 12;
+      g.fillText(w, x, y);
+      g.shadowBlur = 0;
+      x += g.measureText(w + " ").width;
+    });
+  });
+  // quote mark
+  if (hasQuote) {
+    g.fillStyle = GOLD; g.font = `${size * 1.3}px Anton, Georgia, serif`;
+    g.fillText("\u201C", padX - 2, blockBottom - (lines.length - 1) * lineH - size * 0.95);
+  }
+  // underline stroke
+  g.strokeStyle = GOLD; g.lineWidth = wide ? 6 : 10; g.lineCap = "round";
+  g.beginPath(); g.moveTo(padX, blockBottom + (wide ? 22 : 30)); g.quadraticCurveTo(W * 0.35, blockBottom + (wide ? 16 : 22), W * 0.62, blockBottom + (wide ? 20 : 26)); g.stroke();
+  // caption
+  if (hasCap) {
+    g.fillStyle = GOLD; g.fillRect(padX, capBottom - (wide ? 22 : 32), 5, wide ? 28 : 40);
+    g.fillStyle = "#e4e4e7"; g.font = `${wide ? 22 : 32}px Anton, Impact, sans-serif`;
+    try { g.letterSpacing = "3px"; } catch (e) { /* older browsers */ }
+    g.fillText(caption.trim().toUpperCase().slice(0, 60), padX + 20, capBottom);
+    try { g.letterSpacing = "0px"; } catch (e) { /* ignore */ }
+  }
+  return await new Promise((res, rej) => c.toBlob(b => (b ? res(b) : rej(new Error("export failed"))), "image/jpeg", 0.9));
+}
+
 function GistManager({ gist, setGist }) {
   const [editingId, setEditingId] = useState(null);
   const [open, setOpen] = useState(false);
@@ -1063,29 +1173,31 @@ function GistManager({ gist, setGist }) {
   const [artistCovers, setArtistCovers] = useState([]);
   const [artistMsg, setArtistMsg] = useState("");
 
-  const makeBrandedCover = () => {
-    const W = 1200, H = 630;
-    const c = document.createElement("canvas"); c.width = W; c.height = H;
-    const g = c.getContext("2d");
-    const grad = g.createLinearGradient(0, 0, W, H);
-    grad.addColorStop(0, "#1c1917"); grad.addColorStop(0.6, "#27272a"); grad.addColorStop(1, "#78350f");
-    g.fillStyle = grad; g.fillRect(0, 0, W, H);
-    g.fillStyle = "rgba(245,158,11,0.12)"; g.beginPath(); g.arc(1050, 120, 260, 0, Math.PI * 2); g.fill();
-    g.fillStyle = "#f59e0b"; g.fillRect(70, 90, 8, 360);
-    g.font = "600 26px Georgia, serif"; g.fillStyle = "#f59e0b";
-    g.fillText((category || "News").toUpperCase(), 110, 120);
-    g.fillStyle = "#fafafa"; g.font = "700 62px Georgia, serif";
-    const words = (title || "MyGospelHub").split(" "); const lines = []; let line = "";
-    for (const w of words) { const t = line ? line + " " + w : w; if (g.measureText(t).width > 980 && line) { lines.push(line); line = w; } else line = t; }
-    lines.push(line);
-    lines.slice(0, 4).forEach((l, i) => g.fillText(l + (i === 3 && lines.length > 4 ? "…" : ""), 110, 215 + i * 78));
-    g.font = "600 30px Georgia, serif"; g.fillStyle = "#d4d4d8"; g.fillText("MyGospelHub", 70, 560);
-    c.toBlob((blob) => {
-      if (!blob) return;
-      const f = new File([blob], "cover.png", { type: "image/png" });
-      setCoverUrlPick(""); setCoverFile(f); setCoverPreview(URL.createObjectURL(f));
-    }, "image/png");
-  };
+  const [overlayOn, setOverlayOn] = useState(true);
+  const [format, setFormat] = useState("post");
+  const [caption, setCaption] = useState("");
+  const [useGen, setUseGen] = useState(false);
+  const [composed, setComposed] = useState(null);
+  const [coverNote, setCoverNote] = useState("");
+
+  const makeBrandedCover = () => { setCoverFile(null); setCoverUrlPick(""); setCoverPreview(""); setUseGen(true); setOverlayOn(true); };
+
+  useEffect(() => {
+    let dead = false;
+    const src = coverFile || coverUrlPick || null;
+    if (!(useGen || (src && overlayOn))) { setComposed(null); setCoverNote(""); return; }
+    const timer = setTimeout(async () => {
+      try {
+        const blob = await composeCover({ src: useGen ? null : src, title, category, caption, format });
+        if (dead) return;
+        setCoverNote("");
+        setComposed(prev => { if (prev) URL.revokeObjectURL(prev.url); return { blob, url: URL.createObjectURL(blob) }; });
+      } catch (e) {
+        if (!dead) { setComposed(null); setCoverNote("Could not add the headline to this image (" + e.message + "). It will be used as it is."); }
+      }
+    }, 350);
+    return () => { dead = true; clearTimeout(timer); };
+  }, [coverFile, coverUrlPick, useGen, overlayOn, title, category, caption, format]);
 
   const searchArtistCovers = async () => {
     setArtistMsg(""); setArtistCovers([]);
@@ -1097,7 +1209,7 @@ function GistManager({ gist, setGist }) {
     if (!list.length) setArtistMsg("No covers for that artiste on your site yet.");
   };
 
-  const pickArtistCover = (url) => { setCoverFile(null); setCoverUrlPick(url); setCoverPreview(url); setArtistCovers([]); };
+  const pickArtistCover = (url) => { setUseGen(false); setCoverFile(null); setCoverUrlPick(url); setCoverPreview(url); setArtistCovers([]); };
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [aiFacts, setAiFacts] = useState("");
@@ -1162,13 +1274,13 @@ function GistManager({ gist, setGist }) {
 
   const resetForm = () => {
     setAiFacts(""); setMetaDesc(""); setActiveLead(null); setTitle(""); setCategory("Community"); setUploadedBy("MyGospelHub"); setBody("");
-    setCoverFile(null); setCoverPreview(""); setCoverUrlPick(""); setArtistQ(""); setArtistCovers([]); setArtistMsg(""); setError(""); setOpen(false);
+    setCoverFile(null); setCoverPreview(""); setCoverUrlPick(""); setUseGen(false); setCaption(""); setArtistQ(""); setArtistCovers([]); setArtistMsg(""); setError(""); setOpen(false);
   };
 
   const handleCoverSelect = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setCoverUrlPick(""); setCoverFile(file);
+    setUseGen(false); setCoverUrlPick(""); setCoverFile(file);
     setCoverPreview(URL.createObjectURL(file));
   };
 
@@ -1185,7 +1297,12 @@ function GistManager({ gist, setGist }) {
     setSubmitting(true);
 
     let coverUrl = coverUrlPick || null;
-    if (coverFile) {
+    if (composed?.blob) {
+      const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.jpeg`;
+      const { error: upErr } = await supabase.storage.from("covers").upload(path, composed.blob, { contentType: "image/jpeg" });
+      if (upErr) { setError("Cover image upload failed: " + upErr.message); setSubmitting(false); return; }
+      coverUrl = supabase.storage.from("covers").getPublicUrl(path).data.publicUrl;
+    } else if (coverFile) {
       let jpegFile;
       try {
         jpegFile = await convertImageToJpeg(coverFile);
@@ -1292,8 +1409,8 @@ function GistManager({ gist, setGist }) {
             <div className="shrink-0">
               <label className="text-xs text-zinc-500 mb-1.5 block">Cover image</label>
               <label className="w-24 h-24 rounded-lg border border-dashed border-zinc-800 bg-zinc-950 flex items-center justify-center cursor-pointer overflow-hidden hover:border-zinc-700 transition-colors">
-                {coverPreview ? (
-                  <img src={coverPreview} alt="Cover preview" className="w-full h-full object-cover" />
+                {(composed?.url || coverPreview) ? (
+                  <img src={composed?.url || coverPreview} alt="Cover preview" className="w-full h-full object-cover" />
                 ) : (
                   <Upload size={18} className="text-zinc-600" />
                 )}
@@ -1342,6 +1459,28 @@ function GistManager({ gist, setGist }) {
                     {artistCovers.map(r => <img key={r.cover_url} src={r.cover_url} alt={r.title} title={r.title} onClick={() => pickArtistCover(r.cover_url)} className="w-16 h-16 rounded-lg object-cover cursor-pointer border border-zinc-800 hover:border-amber-500 shrink-0" />)}
                   </div>
                 )}
+              </div>
+              <div className="col-span-3 rounded-lg border border-zinc-800 p-3">
+                <label className="flex items-center gap-2 text-xs text-zinc-300">
+                  <input type="checkbox" checked={overlayOn} onChange={e => setOverlayOn(e.target.checked)} /> Add headline + MyGospelHub logo to the cover
+                </label>
+                {(overlayOn || useGen) && (
+                  <div className="mt-3 grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-zinc-500 mb-1 block">Cover shape</label>
+                      <select value={format} onChange={e => setFormat(e.target.value)} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none">
+                        <option value="post">Post 4:5 (like the Jalaloaded style)</option>
+                        <option value="wide">Wide (best for link previews)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs text-zinc-500 mb-1 block">Small line under headline (optional)</label>
+                      <input value={caption} onChange={e => setCaption(e.target.value)} maxLength={60} placeholder="e.g. Musa Peace Affos alleged" className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none" />
+                    </div>
+                  </div>
+                )}
+                {coverNote && <p className="text-xs text-amber-400 mt-2">{coverNote}</p>}
+                {composed && <img src={composed.url} alt="Cover preview" className="mt-3 w-full max-w-xs rounded-lg border border-zinc-800" />}
               </div>
               <div className="col-span-3 rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
                 <label className="text-xs text-amber-400 mb-1.5 block">AI draft helper <span className="text-zinc-500">(free) — paste facts or notes; it writes a draft you must check before publishing</span></label>
