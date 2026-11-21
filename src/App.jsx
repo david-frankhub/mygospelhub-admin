@@ -1060,9 +1060,31 @@ function GistManager({ gist, setGist }) {
   const [coverPreview, setCoverPreview] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [aiFacts, setAiFacts] = useState("");
+  const [aiBusy, setAiBusy] = useState(false);
+
+  const generateWithAI = async () => {
+    setError("");
+    if (aiFacts.trim().length < 20) { setError("Paste the facts or notes for the AI first."); return; }
+    setAiBusy(true);
+    try {
+      const { data: sess } = await supabase.auth.getSession();
+      const res = await fetch("https://mygospelhub.com.ng/api/ai/draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${sess?.session?.access_token || ""}` },
+        body: JSON.stringify({ facts: aiFacts }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.error || "AI request failed.");
+      setTitle(d.title || ""); setCategory(d.category || "General"); setBody(d.body || "");
+    } catch (e) {
+      setError("AI: " + e.message);
+    }
+    setAiBusy(false);
+  };
 
   const resetForm = () => {
-    setTitle(""); setCategory("Community"); setUploadedBy("MyGospelHub"); setBody("");
+    setAiFacts(""); setTitle(""); setCategory("Community"); setUploadedBy("MyGospelHub"); setBody("");
     setCoverFile(null); setCoverPreview(""); setError(""); setOpen(false);
   };
 
@@ -1204,6 +1226,11 @@ function GistManager({ gist, setGist }) {
               <div className="col-span-3">
                 <label className="text-xs text-zinc-500 mb-1.5 block">Posted by <span className="text-zinc-600">(shown as "By ...")</span></label>
                 <input value={uploadedBy} onChange={e => setUploadedBy(e.target.value)} placeholder="MyGospelHub" className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50" />
+              </div>
+              <div className="col-span-3 rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
+                <label className="text-xs text-amber-400 mb-1.5 block">AI draft helper <span className="text-zinc-500">(free) — paste facts or notes; it writes a draft you must check before publishing</span></label>
+                <textarea value={aiFacts} onChange={e => setAiFacts(e.target.value)} placeholder="Paste the facts: who, what, when, where, quotes you have permission to use..." rows={4} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50 resize-none" />
+                <button type="button" onClick={generateWithAI} disabled={aiBusy} className="mt-2 bg-amber-500 hover:bg-amber-400 disabled:opacity-60 text-zinc-950 text-xs font-semibold px-3 py-2 rounded-lg">{aiBusy ? "Writing draft..." : "Generate draft with AI"}</button>
               </div>
               <div className="col-span-3">
                 <label className="text-xs text-zinc-500 mb-1.5 block">Article body</label>
