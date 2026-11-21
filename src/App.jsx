@@ -1082,7 +1082,7 @@ function GistManager({ gist, setGist }) {
       const res = await fetch("https://mygospelhub.com.ng/api/ai/fetch-leads", { method: "POST", headers: { Authorization: `Bearer ${sess?.session?.access_token || ""}` } });
       const d = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(d.error || "Failed");
-      setLeadsMsg(d.added ? `${d.added} new leads found.` : "No new leads right now.");
+      setLeadsMsg(d.added ? `${d.added} new leads found.` : (d.found ? "Nothing new since last time." : "The news sources returned nothing. Details: " + (d.diag || []).join(", ")));
       await loadLeads();
     } catch (e) { setLeadsMsg("Could not fetch: " + e.message); }
     setLeadsBusy(false);
