@@ -1180,8 +1180,18 @@ function GistManager({ gist, setGist }) {
 
   const openFb = (g) => {
     const link = `https://mygospelhub.com.ng/gist/${g.slug || g.id}`;
-    const blurb = (g.meta_description || (g.body || "").replace(/\s+/g, " ").slice(0, 180)).trim();
-    setFbText(`${g.title}\n\n${blurb}${blurb && !/[.!?…]$/.test(blurb) ? "…" : ""}\n\n👉 Read the full story: ${link}\n\n#MyGospelHub #NigerianGospel`);
+    // Caption = headline + the first half of the article (whole paragraphs) + the link to read the rest.
+    const paras = (g.body || "").split(/\n\s*\n/).map(x => x.trim()).filter(Boolean);
+    const total = paras.reduce((n, x) => n + x.length, 0);
+    let picked = [], used = 0;
+    for (const para of paras) {
+      if (picked.length && used >= total * 0.5) break;
+      picked.push(para); used += para.length;
+    }
+    let excerpt = picked.join("\n\n");
+    if (!excerpt) excerpt = (g.meta_description || "").trim();
+    const more = picked.length < paras.length ? "\n\n…" : "";
+    setFbText(`${g.title}\n\n${excerpt}${more}\n\n👉 Read the full story: ${link}\n\n#MyGospelHub #NigerianGospel`);
     setFbMsg(""); setFbItem(g);
   };
   const copyFb = async () => {
@@ -1450,7 +1460,7 @@ function GistManager({ gist, setGist }) {
             <h3 className="text-sm font-semibold text-zinc-100 mb-3">Post to Facebook Page</h3>
             {fbItem.cover_url ? <img src={fbItem.cover_url} alt="Cover" className="w-full rounded-lg border border-zinc-800 mb-3" /> : <p className="text-xs text-rose-400 mb-3">This article has no cover image. Add one first.</p>}
             {fbItem.fb_post_id && <p className="text-xs text-amber-400 mb-2">Already posted once. Posting again makes a second post.</p>}
-            <textarea value={fbText} onChange={e => setFbText(e.target.value)} rows={9} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50" />
+            <textarea value={fbText} onChange={e => setFbText(e.target.value)} rows={14} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50" />
             {fbMsg && <p className="text-xs text-rose-400 mt-2">{fbMsg}</p>}
             <div className="mt-3 rounded-lg border border-zinc-800 p-3">
               <p className="text-xs text-zinc-400 mb-2">No Facebook link set up? Post it yourself in 30 seconds:</p>
