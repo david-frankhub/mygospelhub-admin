@@ -1135,7 +1135,7 @@ function GistManager({ gist, setGist }) {
 
   const draftFromLead = (l) => {
     setActiveLead(l.id);
-    setAiFacts(`Headline from source: ${l.title}\nSource: ${l.source || "unknown"} (${l.url})\nSummary: ${l.snippet || ""}\n\nAdd more facts here from the source article (open the link, read it, and paste the key facts in your own notes):\n`);
+    setAiFacts(`Headline: ${l.title}\nReported by: ${l.source || "unknown"}\nSummary: ${l.snippet || ""}\n\nMore facts (open "Read source", then type the key facts here in your own words):\n`);
     setOpen(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
