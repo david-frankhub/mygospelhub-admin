@@ -1184,6 +1184,41 @@ function GistManager({ gist, setGist }) {
     setFbText(`${g.title}\n\n${blurb}${blurb && !/[.!?…]$/.test(blurb) ? "…" : ""}\n\n👉 Read the full story: ${link}\n\n#MyGospelHub #NigerianGospel`);
     setFbMsg(""); setFbItem(g);
   };
+  const copyFb = async () => {
+    try { await navigator.clipboard.writeText(fbText); setFbMsg("Caption copied."); }
+    catch (e) { setFbMsg("Could not copy. Select the text and copy it by hand."); }
+  };
+  const getCoverFile = async () => {
+    const r = await fetch(fbItem.cover_url);
+    const b = await r.blob();
+    return new File([b], "cover.jpg", { type: b.type || "image/jpeg" });
+  };
+  const downloadFbCover = async () => {
+    try {
+      const f = await getCoverFile();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(f); a.download = "cover.jpg";
+      document.body.appendChild(a); a.click(); a.remove();
+      setFbMsg("Cover saved to your phone.");
+    } catch (e) { window.open(fbItem.cover_url, "_blank"); }
+  };
+  const shareFbPhone = async () => {
+    // Opens the phone's share sheet with the cover + caption; pick Facebook there.
+    try { await navigator.clipboard.writeText(fbText); } catch (e) { /* ignore */ }
+    try {
+      const f = await getCoverFile();
+      if (navigator.canShare && navigator.canShare({ files: [f] })) {
+        await navigator.share({ files: [f], text: fbText });
+        return;
+      }
+      setFbMsg("This phone can't share the picture directly. Caption copied; use Download cover, then post on Facebook.");
+    } catch (e) { if (e && e.name !== "AbortError") setFbMsg("Caption copied. Use Download cover, then post on Facebook."); }
+  };
+  const markFbPosted = async () => {
+    await supabase.from("gist_articles").update({ fb_post_id: "manual" }).eq("id", fbItem.id);
+    setGist(gist.map(x => x.id === fbItem.id ? { ...x, fb_post_id: "manual" } : x));
+    setFbItem(null);
+  };
   const sendFb = async () => {
     setFbBusy(true); setFbMsg("");
     try {
@@ -1416,9 +1451,18 @@ function GistManager({ gist, setGist }) {
             {fbItem.fb_post_id && <p className="text-xs text-amber-400 mb-2">Already posted once. Posting again makes a second post.</p>}
             <textarea value={fbText} onChange={e => setFbText(e.target.value)} rows={9} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50" />
             {fbMsg && <p className="text-xs text-rose-400 mt-2">{fbMsg}</p>}
+            <div className="mt-3 rounded-lg border border-zinc-800 p-3">
+              <p className="text-xs text-zinc-400 mb-2">No Facebook link set up? Post it yourself in 30 seconds:</p>
+              <div className="flex gap-2 flex-wrap">
+                <button type="button" onClick={shareFbPhone} disabled={!fbItem.cover_url} className="text-xs bg-blue-500 hover:bg-blue-400 disabled:opacity-60 text-white font-semibold rounded-lg px-3 py-2">Share to Facebook (phone)</button>
+                <button type="button" onClick={copyFb} className="text-xs border border-zinc-700 text-zinc-300 rounded-lg px-3 py-2">Copy caption</button>
+                <button type="button" onClick={downloadFbCover} disabled={!fbItem.cover_url} className="text-xs border border-zinc-700 text-zinc-300 rounded-lg px-3 py-2">Download cover</button>
+              </div>
+            </div>
             <div className="flex gap-2 mt-3 justify-end">
-              <button onClick={() => setFbItem(null)} disabled={fbBusy} className="text-xs text-zinc-400 px-3 py-2">Cancel</button>
-              <button onClick={sendFb} disabled={fbBusy || !fbItem.cover_url} className="text-xs bg-blue-500 hover:bg-blue-400 disabled:opacity-60 text-white font-semibold rounded-lg px-4 py-2">{fbBusy ? "Posting..." : "Post now"}</button>
+              <button onClick={markFbPosted} disabled={fbBusy} className="text-xs text-zinc-400 px-3 py-2">I posted it</button>
+              <button onClick={() => setFbItem(null)} disabled={fbBusy} className="text-xs text-zinc-400 px-3 py-2">Close</button>
+              <button onClick={sendFb} disabled={fbBusy || !fbItem.cover_url} className="text-xs bg-zinc-700 text-zinc-200 hover:bg-blue-400 disabled:opacity-60 text-white font-semibold rounded-lg px-4 py-2">{fbBusy ? "Posting..." : "Post automatically"}</button>
             </div>
           </div>
         </div>
