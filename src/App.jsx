@@ -1173,6 +1173,35 @@ function GistManager({ gist, setGist }) {
   const [artistCovers, setArtistCovers] = useState([]);
   const [artistMsg, setArtistMsg] = useState("");
 
+  const [fbItem, setFbItem] = useState(null);
+  const [fbText, setFbText] = useState("");
+  const [fbBusy, setFbBusy] = useState(false);
+  const [fbMsg, setFbMsg] = useState("");
+
+  const openFb = (g) => {
+    const link = `https://mygospelhub.com.ng/gist/${g.slug || g.id}`;
+    const blurb = (g.meta_description || (g.body || "").replace(/\s+/g, " ").slice(0, 180)).trim();
+    setFbText(`${g.title}\n\n${blurb}${blurb && !/[.!?…]$/.test(blurb) ? "…" : ""}\n\n👉 Read the full story: ${link}\n\n#MyGospelHub #NigerianGospel`);
+    setFbMsg(""); setFbItem(g);
+  };
+  const sendFb = async () => {
+    setFbBusy(true); setFbMsg("");
+    try {
+      const { data: sess } = await supabase.auth.getSession();
+      const res = await fetch("https://mygospelhub.com.ng/api/fb/post", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${sess?.session?.access_token || ""}` },
+        body: JSON.stringify({ message: fbText, image_url: fbItem.cover_url }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.error || "Failed");
+      await supabase.from("gist_articles").update({ fb_post_id: String(d.id) }).eq("id", fbItem.id);
+      setGist(gist.map(x => x.id === fbItem.id ? { ...x, fb_post_id: String(d.id) } : x));
+      setFbItem(null);
+    } catch (e) { setFbMsg(e.message); }
+    setFbBusy(false);
+  };
+
   const [overlayOn, setOverlayOn] = useState(true);
   const [format, setFormat] = useState("post");
   const [caption, setCaption] = useState("");
@@ -1379,6 +1408,22 @@ function GistManager({ gist, setGist }) {
         );
       })()}
 
+      {fbItem && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" onClick={() => !fbBusy && setFbItem(null)}>
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <h3 className="text-sm font-semibold text-zinc-100 mb-3">Post to Facebook Page</h3>
+            {fbItem.cover_url ? <img src={fbItem.cover_url} alt="Cover" className="w-full rounded-lg border border-zinc-800 mb-3" /> : <p className="text-xs text-rose-400 mb-3">This article has no cover image. Add one first.</p>}
+            {fbItem.fb_post_id && <p className="text-xs text-amber-400 mb-2">Already posted once. Posting again makes a second post.</p>}
+            <textarea value={fbText} onChange={e => setFbText(e.target.value)} rows={9} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50" />
+            {fbMsg && <p className="text-xs text-rose-400 mt-2">{fbMsg}</p>}
+            <div className="flex gap-2 mt-3 justify-end">
+              <button onClick={() => setFbItem(null)} disabled={fbBusy} className="text-xs text-zinc-400 px-3 py-2">Cancel</button>
+              <button onClick={sendFb} disabled={fbBusy || !fbItem.cover_url} className="text-xs bg-blue-500 hover:bg-blue-400 disabled:opacity-60 text-white font-semibold rounded-lg px-4 py-2">{fbBusy ? "Posting..." : "Post now"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 mb-5">
         <div className="flex items-center justify-between gap-3">
           <button onClick={() => setLeadsOpen(!leadsOpen)} className="text-sm font-semibold text-zinc-100 text-left">News leads (AI inbox) <span className="ml-1 text-xs bg-amber-500 text-zinc-950 rounded-full px-2 py-0.5">{leads.length}</span></button>
@@ -1543,6 +1588,7 @@ function GistManager({ gist, setGist }) {
                     <div className="flex items-center gap-1 justify-end">
                       <button onClick={() => setEditingId(g.id)} title="Edit details" className="p-1.5 text-zinc-500 hover:text-amber-400 hover:bg-amber-500/10 rounded-md transition-colors"><Edit3 size={14} /></button>
                       <button onClick={() => toggleStatus(g.id, g.status)} title={g.status === "Published" ? "Unpublish" : "Publish"} className="p-1.5 text-zinc-500 hover:text-emerald-400 hover:bg-emerald-500/10 rounded-md transition-colors">{g.status === "Published" ? <X size={14} /> : <Check size={14} />}</button>
+                      {g.status === "Published" && <button onClick={() => openFb(g)} title="Post to Facebook" className={"px-2 py-1 text-[11px] rounded-md border " + (g.fb_post_id ? "border-emerald-500/40 text-emerald-400" : "border-zinc-700 text-zinc-300 hover:border-blue-400 hover:text-blue-400")}>{g.fb_post_id ? "FB ✓" : "FB"}</button>}
                       <button onClick={() => remove(g.id)} title="Delete" className="p-1.5 text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-md transition-colors"><Trash2 size={14} /></button>
                     </div>
                   </td>
