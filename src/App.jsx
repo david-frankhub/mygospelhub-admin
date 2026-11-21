@@ -1278,6 +1278,7 @@ function GistManager({ gist, setGist }) {
   const [submitting, setSubmitting] = useState(false);
   const [aiFacts, setAiFacts] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
+  const [aiLength, setAiLength] = useState("standard");
   const [metaDesc, setMetaDesc] = useState("");
   const [leads, setLeads] = useState([]);
   const [leadsOpen, setLeadsOpen] = useState(false);
@@ -1325,7 +1326,7 @@ function GistManager({ gist, setGist }) {
       const res = await fetch("https://mygospelhub.com.ng/api/ai/draft", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${sess?.session?.access_token || ""}` },
-        body: JSON.stringify({ facts: aiFacts }),
+        body: JSON.stringify({ facts: aiFacts, length: aiLength }),
       });
       const d = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error((d.error || "AI request failed.") + (d.debug ? " [" + d.debug.slice(0, 120) + "]" : ""));
@@ -1574,7 +1575,14 @@ function GistManager({ gist, setGist }) {
               <div className="col-span-3 rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
                 <label className="text-xs text-amber-400 mb-1.5 block">AI draft helper <span className="text-zinc-500">(free) — paste facts or notes; it writes a draft you must check before publishing</span></label>
                 <textarea value={aiFacts} onChange={e => setAiFacts(e.target.value)} placeholder="Paste the facts: who, what, when, where, quotes you have permission to use..." rows={4} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50 resize-none" />
-                <button type="button" onClick={generateWithAI} disabled={aiBusy} className="mt-2 bg-amber-500 hover:bg-amber-400 disabled:opacity-60 text-zinc-950 text-xs font-semibold px-3 py-2 rounded-lg">{aiBusy ? "Writing draft..." : "Generate draft with AI"}</button>
+                <div className="mt-2 flex items-center gap-2 flex-wrap">
+                  <select value={aiLength} onChange={e => setAiLength(e.target.value)} className="bg-zinc-950 border border-zinc-800 rounded-lg px-2 py-2 text-xs text-zinc-100 outline-none">
+                    <option value="short">Short (~200 words)</option>
+                    <option value="standard">Standard (~550 words)</option>
+                    <option value="long">Long (~900 words)</option>
+                  </select>
+                  <button type="button" onClick={generateWithAI} disabled={aiBusy} className="bg-amber-500 hover:bg-amber-400 disabled:opacity-60 text-zinc-950 text-xs font-semibold px-3 py-2 rounded-lg">{aiBusy ? "Writing draft..." : "Generate draft with AI"}</button>
+                </div>
               </div>
               <div className="col-span-3">
                 <label className="text-xs text-zinc-500 mb-1.5 block">Article body</label>
