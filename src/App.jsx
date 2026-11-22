@@ -1180,14 +1180,9 @@ function GistManager({ gist, setGist }) {
 
   const openFb = (g) => {
     const link = `https://mygospelhub.com.ng/gist/${g.slug || g.id}`;
-    // Caption = headline + the first half of the article (whole paragraphs) + the link to read the rest.
+    // Caption = headline + the first 3 paragraphs of the article + the link to read the rest.
     const paras = (g.body || "").split(/\n\s*\n/).map(x => x.trim()).filter(Boolean);
-    const total = paras.reduce((n, x) => n + x.length, 0);
-    let picked = [], used = 0;
-    for (const para of paras) {
-      if (picked.length && used >= total * 0.5) break;
-      picked.push(para); used += para.length;
-    }
+    const picked = paras.slice(0, 3);
     let excerpt = picked.join("\n\n");
     if (!excerpt) excerpt = (g.meta_description || "").trim();
     const more = picked.length < paras.length ? "\n\n…" : "";
