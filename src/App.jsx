@@ -744,8 +744,98 @@ function EditContentForm({ item, onSave, onCancel }) {
   );
 }
 
+// ---------- Share a song/video to the Facebook Page (cover photo + caption with the link) ----------
+function FbShareModal({ item, initialText, table, onClose, onPosted }) {
+  const [text, setText] = useState(initialText);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  const getCoverFile = async () => {
+    const r = await fetch(item.cover_url);
+    const b = await r.blob();
+    return new File([b], "cover.jpg", { type: b.type || "image/jpeg" });
+  };
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(text); setMsg("Caption copied."); }
+    catch (e) { setMsg("Could not copy. Select the text and copy it by hand."); }
+  };
+  const download = async () => {
+    try {
+      const f = await getCoverFile();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(f); a.download = "cover.jpg";
+      document.body.appendChild(a); a.click(); a.remove();
+      setMsg("Cover saved to your phone.");
+    } catch (e) { window.open(item.cover_url, "_blank"); }
+  };
+  const sharePhone = async () => {
+    try { await navigator.clipboard.writeText(text); } catch (e) { /* ignore */ }
+    try {
+      const f = await getCoverFile();
+      if (navigator.canShare && navigator.canShare({ files: [f] })) { await navigator.share({ files: [f], text }); return; }
+      setMsg("This phone can't share the picture directly. Caption copied; use Download cover, then post on Facebook.");
+    } catch (e) { if (e && e.name !== "AbortError") setMsg("Caption copied. Use Download cover, then post on Facebook."); }
+  };
+  const markPosted = async () => {
+    await supabase.from(table).update({ fb_post_id: "manual" }).eq("id", item.id);
+    onPosted("manual");
+  };
+  const send = async () => {
+    setBusy(true); setMsg("");
+    try {
+      const { data: sess } = await supabase.auth.getSession();
+      const res = await fetch("https://mygospelhub.com.ng/api/fb/post", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${sess?.session?.access_token || ""}` },
+        body: JSON.stringify({ message: text, image_url: item.cover_url }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.error || "Failed");
+      await supabase.from(table).update({ fb_post_id: String(d.id) }).eq("id", item.id);
+      onPosted(String(d.id));
+    } catch (e) { setMsg(e.message); }
+    setBusy(false);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" onClick={() => !busy && onClose()}>
+      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <h3 className="text-sm font-semibold text-zinc-100 mb-3">Post to Facebook Page</h3>
+        {item.cover_url ? <img src={item.cover_url} alt="Cover" className="w-full rounded-lg border border-zinc-800 mb-3" /> : <p className="text-xs text-rose-400 mb-3">This {item.type === "Video" ? "video" : "song"} has no cover image. Add one first (Edit).</p>}
+        {item.fb_post_id && <p className="text-xs text-amber-400 mb-2">Already posted once. Posting again makes a second post.</p>}
+        <textarea value={text} onChange={e => setText(e.target.value)} rows={12} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50" />
+        {msg && <p className="text-xs text-amber-400 mt-2">{msg}</p>}
+        <div className="mt-3 rounded-lg border border-zinc-800 p-3">
+          <p className="text-xs text-zinc-400 mb-2">Or post it yourself in 30 seconds:</p>
+          <div className="flex gap-2 flex-wrap">
+            <button type="button" onClick={sharePhone} disabled={!item.cover_url} className="text-xs bg-blue-500 hover:bg-blue-400 disabled:opacity-60 text-white font-semibold rounded-lg px-3 py-2">Share to Facebook (phone)</button>
+            <button type="button" onClick={copy} className="text-xs border border-zinc-700 text-zinc-300 rounded-lg px-3 py-2">Copy caption</button>
+            <button type="button" onClick={download} disabled={!item.cover_url} className="text-xs border border-zinc-700 text-zinc-300 rounded-lg px-3 py-2">Download cover</button>
+          </div>
+        </div>
+        <div className="flex gap-2 mt-3 justify-end">
+          <button onClick={markPosted} disabled={busy} className="text-xs text-zinc-400 px-3 py-2">I posted it</button>
+          <button onClick={onClose} disabled={busy} className="text-xs text-zinc-400 px-3 py-2">Close</button>
+          <button onClick={send} disabled={busy || !item.cover_url} className="text-xs bg-blue-500 hover:bg-blue-400 disabled:opacity-60 text-white font-semibold rounded-lg px-4 py-2">{busy ? "Posting..." : "Post automatically"}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function fbCaptionForContent(c) {
+  const isVideo = c.type === "Video";
+  const link = `https://mygospelhub.com.ng/${isVideo ? "video" : "song"}/${c.slug || c.id}`;
+  const desc = (c.description || "").replace(/\s+/g, " ").trim();
+  const blurb = desc.length > 400 ? desc.slice(0, 400).replace(/\s+\S*$/, "") + "…" : desc;
+  const upcoming = c.release_date && new Date(c.release_date).getTime() > Date.now()
+    ? `\n\n🗓 Releases ${new Date(c.release_date).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}` : "";
+  return `${isVideo ? "🎬 NEW VIDEO" : "🎵 NEW SONG"}: ${c.title}${c.artist ? " – " + c.artist : ""}${blurb ? "\n\n" + blurb : ""}${upcoming}\n\n${isVideo ? "▶️ Watch now" : "⬇️ Listen and download"}: ${link}\n\n#MyGospelHub #NigerianGospel`;
+}
+
 function ContentTable({ content, setContent }) {
   const [editingId, setEditingId] = useState(null);
+  const [fbShare, setFbShare] = useState(null);
 
   const toggleStatus = async (id, currentStatus) => {
     const newStatus = currentStatus === "Published" ? "Unpublished" : "Published";
@@ -767,6 +857,16 @@ function ContentTable({ content, setContent }) {
 
   return (
     <div>
+      {fbShare && (
+        <FbShareModal
+          key={fbShare.id}
+          item={fbShare}
+          initialText={fbCaptionForContent(fbShare)}
+          table="content"
+          onClose={() => setFbShare(null)}
+          onPosted={(id) => { setContent(content.map(x => x.id === fbShare.id ? { ...x, fb_post_id: id } : x)); setFbShare(null); }}
+        />
+      )}
       <div className="flex items-center justify-between mb-5">
         <div>
           <h2 className="text-xl font-semibold text-zinc-50" style={{ fontFamily: "'Fraunces', serif" }}>Songs &amp; Videos</h2>
@@ -839,6 +939,11 @@ function ContentTable({ content, setContent }) {
                     <Trash2 size={13} /> Delete
                   </button>
                 </div>
+                {c.status === "Published" && (
+                  <button onClick={() => setFbShare(c)} className={"mt-2 w-full py-2 text-xs font-medium rounded-lg border " + (c.fb_post_id ? "border-emerald-500/40 text-emerald-400" : "border-zinc-700 text-zinc-300 hover:border-blue-400 hover:text-blue-400")}>
+                    {c.fb_post_id ? "Posted to Facebook ✓ (post again)" : "Post to Facebook"}
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -894,6 +999,7 @@ function ContentTable({ content, setContent }) {
                     <div className="flex items-center gap-1 justify-end">
                       <button onClick={() => setEditingId(c.id)} title="Edit details" className="p-1.5 text-zinc-500 hover:text-amber-400 hover:bg-amber-500/10 rounded-md transition-colors"><Edit3 size={14} /></button>
                       <button onClick={() => toggleStatus(c.id, c.status)} title={c.status === "Published" ? "Unpublish" : "Publish"} className="p-1.5 text-zinc-500 hover:text-emerald-400 hover:bg-emerald-500/10 rounded-md transition-colors">{c.status === "Published" ? <X size={14} /> : <Check size={14} />}</button>
+                      {c.status === "Published" && <button onClick={() => setFbShare(c)} title="Post to Facebook" className={"px-2 py-1 text-[11px] rounded-md border " + (c.fb_post_id ? "border-emerald-500/40 text-emerald-400" : "border-zinc-700 text-zinc-300 hover:border-blue-400 hover:text-blue-400")}>{c.fb_post_id ? "FB ✓" : "FB"}</button>}
                       <button onClick={() => remove(c.id)} title="Delete" className="p-1.5 text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-md transition-colors"><Trash2 size={14} /></button>
                     </div>
                   </td>
