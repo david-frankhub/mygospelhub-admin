@@ -1135,22 +1135,35 @@ function EditGistForm({ item, onSave, onCancel }) {
   const handleCoverSelect = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setUseGen(false);
     setCoverFile(file);
     setCoverPreview(URL.createObjectURL(file));
   };
 
-  const [coverBusy, setCoverBusy] = useState(false);
-  const makeAutoCover = async () => {
-    if (!title.trim()) { setError("Write the headline first."); return; }
-    setError(""); setCoverBusy(true);
-    try {
-      const blob = await composeCover({ src: null, title: title.trim(), category, caption: "", format: "post" });
-      if (!blob) throw new Error("Could not draw the cover.");
-      const f = new File([blob], "auto-cover.jpeg", { type: "image/jpeg" });
-      setCoverFile(f); setCoverPreview(URL.createObjectURL(f));
-    } catch (e) { setError("Auto cover: " + e.message); }
-    setCoverBusy(false);
-  };
+  const [overlayOn, setOverlayOn] = useState(true);
+  const [useGen, setUseGen] = useState(false);
+  const [format, setFormat] = useState("post");
+  const [caption, setCaption] = useState("");
+  const [composed, setComposed] = useState(null);
+  const [coverNote, setCoverNote] = useState("");
+
+  const makeAutoCover = () => { setCoverFile(null); setCoverPreview(item.cover_url || ""); setUseGen(true); setOverlayOn(true); };
+
+  useEffect(() => {
+    let dead = false;
+    if (!(useGen || (coverFile && overlayOn))) { setComposed(null); setCoverNote(""); return; }
+    const timer = setTimeout(async () => {
+      try {
+        const blob = await composeCover({ src: useGen ? null : coverFile, title, category, caption, format });
+        if (dead) return;
+        setCoverNote("");
+        setComposed(prev => { if (prev) URL.revokeObjectURL(prev.url); return { blob, url: URL.createObjectURL(blob) }; });
+      } catch (e) {
+        if (!dead) { setComposed(null); setCoverNote("Could not add the headline to this image (" + e.message + "). It will be used as it is."); }
+      }
+    }, 350);
+    return () => { dead = true; clearTimeout(timer); };
+  }, [coverFile, useGen, overlayOn, title, category, caption, format]);
 
   const save = async () => {
     setError("");
@@ -1163,7 +1176,12 @@ function EditGistForm({ item, onSave, onCancel }) {
     // Only touch cover_url if a new image was actually picked — otherwise
     // leave the existing one alone.
     let coverUrl = item.cover_url || null;
-    if (coverFile) {
+    if (composed?.blob && (useGen || coverFile)) {
+      const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.jpeg`;
+      const { error: upErr } = await supabase.storage.from("covers").upload(path, composed.blob, { contentType: "image/jpeg" });
+      if (upErr) { setError("Cover image upload failed: " + upErr.message); setSaving(false); return; }
+      coverUrl = supabase.storage.from("covers").getPublicUrl(path).data.publicUrl;
+    } else if (coverFile) {
       let jpegFile;
       try {
         jpegFile = await convertImageToJpeg(coverFile);
@@ -1218,13 +1236,13 @@ function EditGistForm({ item, onSave, onCancel }) {
           <label className="text-xs text-zinc-500 mb-1.5 block">Cover image</label>
           <label className="w-24 h-24 rounded-lg border border-dashed border-zinc-800 bg-zinc-950 flex items-center justify-center cursor-pointer overflow-hidden hover:border-zinc-700 transition-colors">
             {coverPreview ? (
-              <img src={coverPreview} alt="Cover preview" className="w-full h-full object-cover" />
+              <img src={composed?.url || coverPreview} alt="Cover preview" className="w-full h-full object-cover" />
             ) : (
               <Upload size={18} className="text-zinc-600" />
             )}
             <input type="file" accept="image/*" onChange={handleCoverSelect} className="hidden" />
           </label>
-          <button type="button" onClick={makeAutoCover} disabled={coverBusy} className="mt-2 w-24 text-[11px] border border-amber-500/40 text-amber-400 rounded-lg py-1.5 disabled:opacity-60">{coverBusy ? "Drawing…" : "Auto cover"}</button>
+          <button type="button" onClick={makeAutoCover} className="mt-2 w-24 text-[11px] border border-amber-500/40 text-amber-400 rounded-lg py-1.5">Auto cover</button>
         </div>
         <div className="flex-1 grid grid-cols-3 gap-4">
           <div className="col-span-2">
@@ -1260,6 +1278,29 @@ function EditGistForm({ item, onSave, onCancel }) {
             <textarea value={body} onChange={e => setBody(e.target.value)} rows={5} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50 resize-none" />
           </div>
         </div>
+      </div>
+
+      <div className="mb-4 rounded-lg border border-zinc-800 p-3">
+        <label className="flex items-center gap-2 text-xs text-zinc-300">
+          <input type="checkbox" checked={overlayOn} onChange={e => setOverlayOn(e.target.checked)} /> Add headline + MyGospelHub logo to a new cover I upload
+        </label>
+        {(overlayOn || useGen) && (
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-zinc-500 mb-1 block">Cover shape</label>
+              <select value={format} onChange={e => setFormat(e.target.value)} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none">
+                <option value="post">Post 4:5 (like the Jalaloaded style)</option>
+                <option value="wide">Wide (best for link previews)</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-zinc-500 mb-1 block">Small line under headline (optional)</label>
+              <input value={caption} onChange={e => setCaption(e.target.value)} maxLength={60} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none" />
+            </div>
+          </div>
+        )}
+        {coverNote && <p className="text-xs text-amber-400 mt-2">{coverNote}</p>}
+        {composed && <img src={composed.url} alt="Cover preview" className="mt-3 w-full max-w-xs rounded-lg border border-zinc-800" />}
       </div>
 
       {error && (
