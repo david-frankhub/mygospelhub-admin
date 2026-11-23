@@ -220,7 +220,7 @@ async function aiDescribe(fields) {
 
 const GENRES = ["Worship", "Praise", "Choir", "Yoruba", "Igbo", "Hausa", "Live Sessions", "Covers", "Events", "Testimonies"];
 
-function UploadForm({ onUpload }) {
+function UploadForm({ onUpload, prefill }) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [artist, setArtist] = useState("");
@@ -250,6 +250,13 @@ function UploadForm({ onUpload }) {
   const [coverPreview, setCoverPreview] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!prefill) return;
+    setOpen(true); setTitle(prefill.title || ""); setArtist(prefill.artist || ""); setType(prefill.type || "Video");
+    setDescription(prefill.notes || ""); setYoutubeUrl(prefill.youtube || ""); setVideoUrl(prefill.videoUrl || "");
+    // eslint-disable-next-line
+  }, [prefill]);
 
   const reset = () => {
     setTitle(""); setArtist(""); setGenre("Worship"); setProducer(""); setUploadedBy("MyGospelHub"); setReleaseDate(""); setYear(new Date().getFullYear());
@@ -861,9 +868,70 @@ function fbCaptionForContent(c) {
   return `${isVideo ? "🎬 NEW VIDEO" : "🎵 NEW SONG"}: ${c.title}${c.artist ? " – " + c.artist : ""}${blurb ? "\n\n" + blurb : ""}${upcoming}\n\n${isVideo ? "▶️ Watch now" : "⬇️ Listen and download"}: ${link}\n\n#MyGospelHub #NigerianGospel`;
 }
 
+function MusicLeads({ onUse }) {
+  const [leads, setLeads] = useState([]);
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  const load = async () => {
+    const { data } = await supabase.from("ai_leads").select("*").eq("status", "new").in("kind", ["song", "video"]).order("published_at", { ascending: false, nullsFirst: false }).limit(60);
+    setLeads(data || []);
+  };
+  useEffect(() => { load(); }, []);
+  const fetchNow = async () => {
+    setBusy(true); setMsg("");
+    try {
+      const { data: sess } = await supabase.auth.getSession();
+      const res = await fetch("https://mygospelhub.com.ng/api/ai/fetch-leads", { method: "POST", headers: { Authorization: `Bearer ${sess?.session?.access_token || ""}` } });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.error || "Request failed");
+      setMsg(d.added ? `${d.added} new leads found (songs, videos and news).` : "Nothing new since last time.");
+      await load();
+    } catch (e) { setMsg("Could not fetch: " + e.message); }
+    setBusy(false);
+  };
+  const dismiss = async (id) => { setLeads(leads.filter(l => l.id !== id)); await supabase.from("ai_leads").update({ status: "dismissed" }).eq("id", id); };
+  const use = async (l) => {
+    const isYt = /youtu\.?be/i.test(l.url);
+    let t = (l.title || "").replace(/\s*[\[(][^\])]*(official|video|audio|lyrics|mp3|download)[^\])]*[\])]/gi, "").replace(/\s+[-–|]\s+[^-–|]*$/, (m) => (/\.(com|ng|net)|news|blog|radio|boiz|gist/i.test(m) ? "" : m)).trim();
+    let artist = "";
+    const m = t.match(/^(.{2,40}?)\s[-–:]\s(.{2,})$/);
+    if (m) { artist = m[1].trim(); t = m[2].trim(); }
+    onUse({ n: Date.now(), title: t, artist, type: l.kind === "song" ? "Audio" : "Video", notes: `${l.snippet || ""}`.trim(), youtube: l.kind === "song" && isYt ? l.url : "", videoUrl: l.kind === "video" && isYt ? l.url : "" });
+    setLeads(leads.filter(x => x.id !== l.id));
+    await supabase.from("ai_leads").update({ status: "drafted" }).eq("id", l.id);
+  };
+  return (
+    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 mb-5">
+      <div className="flex items-center justify-between gap-3">
+        <button onClick={() => setOpen(!open)} className="text-sm font-semibold text-zinc-100 text-left">Song &amp; video leads (AI inbox) <span className="ml-1 text-xs bg-amber-500 text-zinc-950 rounded-full px-2 py-0.5">{leads.length}</span></button>
+        <button onClick={fetchNow} disabled={busy} className="text-xs border border-zinc-700 text-zinc-300 hover:border-amber-500/50 rounded-lg px-3 py-1.5 disabled:opacity-60">{busy ? "Searching..." : "Fetch now"}</button>
+      </div>
+      {msg && <p className="text-xs text-zinc-500 mt-2">{msg}</p>}
+      {open && (
+        <div className="mt-3 space-y-2 max-h-96 overflow-y-auto">
+          {leads.length === 0 && <p className="text-xs text-zinc-500">No leads yet. Tap Fetch now, or wait for the daily search.</p>}
+          {leads.map(l => (
+            <div key={l.id} className="border border-zinc-800 rounded-lg p-3">
+              <p className="text-sm text-zinc-100"><span className="text-[10px] uppercase tracking-wide text-amber-400 mr-1.5">{l.kind}</span>{l.title}</p>
+              <p className="text-xs text-zinc-500 mt-0.5">{l.source || "Source"} {l.published_at ? "· " + timeAgo(l.published_at) : ""}</p>
+              <div className="flex gap-2 mt-2 flex-wrap">
+                <a href={l.url} target="_blank" rel="noreferrer" className="text-xs border border-zinc-700 text-zinc-300 rounded-lg px-3 py-1.5">Open source</a>
+                <button onClick={() => use(l)} className="text-xs bg-amber-500 text-zinc-950 font-semibold rounded-lg px-3 py-1.5">Use in upload form</button>
+                <button onClick={() => dismiss(l.id)} className="text-xs text-zinc-500 px-2 py-1.5">Dismiss</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ContentTable({ content, setContent }) {
   const [editingId, setEditingId] = useState(null);
   const [fbShare, setFbShare] = useState(null);
+  const [prefill, setPrefill] = useState(null);
 
   const toggleStatus = async (id, currentStatus) => {
     const newStatus = currentStatus === "Published" ? "Unpublished" : "Published";
@@ -897,12 +965,13 @@ function ContentTable({ content, setContent }) {
           onPosted={(id) => { setContent(content.map(x => x.id === fbShare.id ? { ...x, fb_post_id: id } : x)); setFbShare(null); }}
         />
       )}
+      <MusicLeads onUse={setPrefill} />
       <div className="flex items-center justify-between mb-5">
         <div>
           <h2 className="text-xl font-semibold text-zinc-50" style={{ fontFamily: "'Fraunces', serif" }}>Songs &amp; Videos</h2>
           <p className="text-sm text-zinc-500 mt-1">Uploads publish straight to the live site</p>
         </div>
-        <UploadForm onUpload={(item) => setContent([item, ...content])} />
+        <UploadForm prefill={prefill} onUpload={(item) => setContent([item, ...content])} />
       </div>
 
       {editingId && (() => {
@@ -1428,7 +1497,7 @@ function GistManager({ gist, setGist }) {
   const [activeLead, setActiveLead] = useState(null);
 
   const loadLeads = async () => {
-    const { data } = await supabase.from("ai_leads").select("*").eq("status", "new").order("published_at", { ascending: false, nullsFirst: false }).limit(60);
+    const { data } = await supabase.from("ai_leads").select("*").eq("status", "new").eq("kind", "news").order("published_at", { ascending: false, nullsFirst: false }).limit(60);
     setLeads(data || []);
   };
   useEffect(() => { loadLeads(); }, []);
