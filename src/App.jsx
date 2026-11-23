@@ -1139,6 +1139,19 @@ function EditGistForm({ item, onSave, onCancel }) {
     setCoverPreview(URL.createObjectURL(file));
   };
 
+  const [coverBusy, setCoverBusy] = useState(false);
+  const makeAutoCover = async () => {
+    if (!title.trim()) { setError("Write the headline first."); return; }
+    setError(""); setCoverBusy(true);
+    try {
+      const blob = await composeCover({ src: null, title: title.trim(), category, caption: "", format: "post" });
+      if (!blob) throw new Error("Could not draw the cover.");
+      const f = new File([blob], "auto-cover.jpeg", { type: "image/jpeg" });
+      setCoverFile(f); setCoverPreview(URL.createObjectURL(f));
+    } catch (e) { setError("Auto cover: " + e.message); }
+    setCoverBusy(false);
+  };
+
   const save = async () => {
     setError("");
     if (!title.trim()) {
@@ -1211,6 +1224,7 @@ function EditGistForm({ item, onSave, onCancel }) {
             )}
             <input type="file" accept="image/*" onChange={handleCoverSelect} className="hidden" />
           </label>
+          <button type="button" onClick={makeAutoCover} disabled={coverBusy} className="mt-2 w-24 text-[11px] border border-amber-500/40 text-amber-400 rounded-lg py-1.5 disabled:opacity-60">{coverBusy ? "Drawing…" : "Auto cover"}</button>
         </div>
         <div className="flex-1 grid grid-cols-3 gap-4">
           <div className="col-span-2">
