@@ -254,7 +254,7 @@ function UploadForm({ onUpload, prefill }) {
   useEffect(() => {
     if (!prefill) return;
     setOpen(true); setTitle(prefill.title || ""); setArtist(prefill.artist || ""); setType(prefill.type || "Video");
-    setDescription(prefill.notes || ""); setYoutubeUrl(prefill.youtube || ""); setVideoUrl(prefill.videoUrl || "");
+    setDescription(prefill.notes || ""); setYoutubeUrl(prefill.youtube || ""); setVideoUrl(prefill.videoUrl || ""); setSpotifyUrl(prefill.spotify || ""); setAudiomackUrl(prefill.audiomack || ""); setFanUrl(prefill.fan || "");
     // eslint-disable-next-line
   }, [prefill]);
 
@@ -892,14 +892,23 @@ function MusicLeads({ onUse }) {
   };
   const dismiss = async (id) => { setLeads(leads.filter(l => l.id !== id)); await supabase.from("ai_leads").update({ status: "dismissed" }).eq("id", id); };
   const use = async (l) => {
-    const isYt = /youtu\.?be/i.test(l.url);
+    setMsg("Looking for YouTube, Spotify, Audiomack and fan links…"); setBusy(true);
+    let found = {};
+    try {
+      const { data: sess } = await supabase.auth.getSession();
+      const res = await fetch("https://mygospelhub.com.ng/api/ai/find-links", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${sess?.session?.access_token || ""}` }, body: JSON.stringify({ url: l.url }) });
+      found = await res.json().catch(() => ({}));
+    } catch (e) { found = {}; }
     let t = (l.title || "").replace(/\s*[\[(][^\])]*(official|video|audio|lyrics|mp3|download)[^\])]*[\])]/gi, "").replace(/\s+[-–|]\s+[^-–|]*$/, (m) => (/\.(com|ng|net)|news|blog|radio|boiz|gist/i.test(m) ? "" : m)).trim();
     let artist = "";
     const m = t.match(/^(.{2,40}?)\s[-–:]\s(.{2,})$/);
     if (m) { artist = m[1].trim(); t = m[2].trim(); }
-    onUse({ n: Date.now(), title: t, artist, type: l.kind === "song" ? "Audio" : "Video", notes: `${l.snippet || ""}`.trim(), youtube: l.kind === "song" && isYt ? l.url : "", videoUrl: l.kind === "video" && isYt ? l.url : "" });
+    const got = ["youtube", "spotify", "audiomack", "fan"].filter(k => found[k]);
+    setMsg(got.length ? `Found: ${got.join(", ")}. Check them in the form.` : (found.note || "No music links found. Paste them yourself in the form."));
+    onUse({ n: Date.now(), title: t, artist, type: l.kind === "song" ? "Audio" : "Video", notes: `${l.snippet || ""}`.trim(), youtube: l.kind === "song" ? (found.youtube || "") : "", videoUrl: l.kind === "video" ? (found.youtube || "") : "", spotify: found.spotify || "", audiomack: found.audiomack || "", fan: found.fan || "" });
     setLeads(leads.filter(x => x.id !== l.id));
     await supabase.from("ai_leads").update({ status: "drafted" }).eq("id", l.id);
+    setBusy(false);
   };
   return (
     <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 mb-5">
