@@ -849,6 +849,8 @@ function ContentTable({ content, setContent }) {
   };
 
   const remove = async (id) => {
+    const item = content.find(c => c.id === id);
+    if (!window.confirm(`Delete "${(item && item.title) || "this item"}"?\n\nThis permanently removes it and cannot be undone.`)) return;
     const prev = content;
     setContent(content.filter(c => c.id !== id));
     const { error } = await supabase.from("content").delete().eq("id", id);
@@ -1522,6 +1524,8 @@ function GistManager({ gist, setGist }) {
   };
 
   const remove = async (id) => {
+    const item = gist.find(g => g.id === id);
+    if (!window.confirm(`Delete "${(item && item.title) || "this news post"}"?\n\nThis permanently removes it and cannot be undone.`)) return;
     const prev = gist;
     setGist(gist.filter(g => g.id !== id));
     const { error } = await supabase.from("gist_articles").delete().eq("id", id);
@@ -1777,6 +1781,7 @@ function UsersAndComments({ users, setUsers, comments, setComments, role }) {
   };
 
   const removeComment = async (id) => {
+    if (!window.confirm("Delete this comment?\n\nThis cannot be undone.")) return;
     const prev = comments;
     setComments(comments.filter(c => c.id !== id));
     const { error } = await supabase.from("comments").delete().eq("id", id);
