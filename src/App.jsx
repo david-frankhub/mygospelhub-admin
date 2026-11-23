@@ -206,6 +206,18 @@ function Dashboard({ content, gist, users, comments }) {
   );
 }
 
+async function aiDescribe(fields) {
+  const { data: sess } = await supabase.auth.getSession();
+  const res = await fetch("https://mygospelhub.com.ng/api/ai/draft", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${sess?.session?.access_token || ""}` },
+    body: JSON.stringify({ mode: "describe", ...fields }),
+  });
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(d.error || "AI request failed.");
+  return d.description;
+}
+
 const GENRES = ["Worship", "Praise", "Choir", "Yoruba", "Igbo", "Hausa", "Live Sessions", "Covers", "Events", "Testimonies"];
 
 function UploadForm({ onUpload }) {
@@ -219,6 +231,13 @@ function UploadForm({ onUpload }) {
   const [releaseDate, setReleaseDate] = useState("");
   const [year, setYear] = useState(new Date().getFullYear());
   const [description, setDescription] = useState("");
+  const [descBusy, setDescBusy] = useState(false);
+  const writeDesc = async () => {
+    setError(""); setDescBusy(true);
+    try { setDescription(await aiDescribe({ title, artist, type, genre, producer, year, notes: description })); }
+    catch (e) { setError("AI: " + e.message); }
+    setDescBusy(false);
+  };
   const [lyrics, setLyrics] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
   const [mediaFile, setMediaFile] = useState(null);
@@ -427,7 +446,8 @@ function UploadForm({ onUpload }) {
       </div>
 
       <div className="mb-4">
-        <label className="text-xs text-zinc-500 mb-1.5 block">Description <span className="text-zinc-600">(optional)</span></label>
+        <label className="text-xs text-zinc-500 mb-1.5 block">Description <span className="text-zinc-600">(optional — type a few notes if you like, then tap AI)</span></label>
+        <button type="button" onClick={writeDesc} disabled={descBusy} className="mb-2 px-3 py-1.5 text-xs font-medium text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 rounded-lg disabled:opacity-50">{descBusy ? "Writing…" : "✨ Write description with AI"}</button>
         <textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="A short note about the song or video..." rows={2} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50 resize-none" />
       </div>
 
@@ -503,6 +523,13 @@ function EditContentForm({ item, onSave, onCancel }) {
   const [releaseDate, setReleaseDate] = useState(item.release_date ? (d => new Date(d.getTime() - d.getTimezoneOffset()*60000).toISOString().slice(0,16))(new Date(item.release_date)) : "");
   const [year, setYear] = useState(item.year || new Date().getFullYear());
   const [description, setDescription] = useState(item.description || "");
+  const [descBusy, setDescBusy] = useState(false);
+  const writeDesc = async () => {
+    setError(""); setDescBusy(true);
+    try { setDescription(await aiDescribe({ title, artist, type: item.type, genre, producer, year, notes: description })); }
+    catch (e) { setError("AI: " + e.message); }
+    setDescBusy(false);
+  };
   const [lyrics, setLyrics] = useState(item.lyrics || "");
   const [videoUrl, setVideoUrl] = useState(item.video_url || "");
   const legacy = item.streaming_link || "";
@@ -697,6 +724,7 @@ function EditContentForm({ item, onSave, onCancel }) {
 
       <div className="mb-4">
         <label className="text-xs text-zinc-500 mb-1.5 block">Description</label>
+        <button type="button" onClick={writeDesc} disabled={descBusy} className="mb-2 px-3 py-1.5 text-xs font-medium text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 rounded-lg disabled:opacity-50">{descBusy ? "Writing…" : "✨ Write description with AI"}</button>
         <textarea value={description} onChange={e => setDescription(e.target.value)} rows={2} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50 resize-none" />
       </div>
 
