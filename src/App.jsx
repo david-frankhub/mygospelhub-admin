@@ -11,6 +11,15 @@ const supabase = createClient(
 );
 
 // ---------- Helpers ----------
+// Decide whether a lead is news, a song or a video (older leads were all saved as "news")
+const leadKindOf = (l) => {
+  if (l.kind === "song" || l.kind === "video") return l.kind;
+  const t = (l.title || "").toLowerCase();
+  if (/\b(official video|music video|lyric video|video premiere|watch (the )?(new )?video)\b/.test(t)) return "video";
+  if (/\b(new song|new single|new music|new album|new track|new ep|album|mp3|download|lyrics|single|track|ep)\b/.test(t) || /\b(releases?|unveils?|premieres?|drops?)\b.*\b(song|single|album|track|ep|music)\b/.test(t)) return "song";
+  return "news";
+};
+
 function timeAgo(dateString) {
   if (!dateString) return "";
   const diff = Date.now() - new Date(dateString).getTime();
@@ -874,8 +883,8 @@ function MusicLeads({ onUse }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
   const load = async () => {
-    const { data } = await supabase.from("ai_leads").select("*").eq("status", "new").in("kind", ["song", "video"]).order("published_at", { ascending: false, nullsFirst: false }).limit(60);
-    setLeads(data || []);
+    const { data } = await supabase.from("ai_leads").select("*").eq("status", "new").order("published_at", { ascending: false, nullsFirst: false }).limit(150);
+    setLeads((data || []).map(l => ({ ...l, kind: leadKindOf(l) })).filter(l => l.kind !== "news").slice(0, 60));
   };
   useEffect(() => { load(); }, []);
   const fetchNow = async () => {
@@ -1561,8 +1570,8 @@ function GistManager({ gist, setGist }) {
   const [activeLead, setActiveLead] = useState(null);
 
   const loadLeads = async () => {
-    const { data } = await supabase.from("ai_leads").select("*").eq("status", "new").eq("kind", "news").order("published_at", { ascending: false, nullsFirst: false }).limit(60);
-    setLeads(data || []);
+    const { data } = await supabase.from("ai_leads").select("*").eq("status", "new").order("published_at", { ascending: false, nullsFirst: false }).limit(150);
+    setLeads((data || []).filter(l => leadKindOf(l) === "news").slice(0, 60));
   };
   useEffect(() => { loadLeads(); }, []);
 
