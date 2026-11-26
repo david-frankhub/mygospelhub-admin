@@ -518,6 +518,14 @@ function UploadForm({ onUpload, prefill }) {
       <div className="mb-4">
         <button type="button" onClick={findLinks} disabled={findBusy || title.trim().length < 2 || artist.trim().length < 2} className="text-xs border border-amber-500/40 text-amber-400 hover:bg-amber-500/10 disabled:opacity-50 rounded-lg px-3 py-2">{findBusy ? "Searching…" : "🔎 Find links with AI (from title + artist)"}</button>
         {findMsg && <p className="text-xs text-zinc-500 mt-2">{findMsg}</p>}
+        {title.trim().length > 1 && artist.trim().length > 1 && (
+          <div className="flex gap-2 flex-wrap mt-2 items-center">
+            <span className="text-[11px] text-zinc-600">Search yourself:</span>
+            <a href={"https://www.youtube.com/results?search_query=" + encodeURIComponent(artist + " " + title)} target="_blank" rel="noreferrer" className="text-xs border border-zinc-700 text-zinc-300 rounded-lg px-2.5 py-1">YouTube</a>
+            <a href={"https://open.spotify.com/search/" + encodeURIComponent(artist + " " + title)} target="_blank" rel="noreferrer" className="text-xs border border-zinc-700 text-zinc-300 rounded-lg px-2.5 py-1">Spotify</a>
+            <a href={"https://audiomack.com/search?q=" + encodeURIComponent(artist + " " + title)} target="_blank" rel="noreferrer" className="text-xs border border-zinc-700 text-zinc-300 rounded-lg px-2.5 py-1">Audiomack</a>
+          </div>
+        )}
       </div>
       {type === "Audio" && (
         <div className="mb-4 space-y-3">
