@@ -1272,6 +1272,8 @@ function EditGistForm({ item, onSave, onCancel }) {
               <option>Faith and Encouragement</option>
               <option>Artist Spotlight</option>
               <option>Entertainment</option>
+              <option>Birthday</option>
+              <option>Awards</option>
               <option>Sports</option>
               <option>Politics</option>
               <option>Health and Well-being</option>
@@ -1812,6 +1814,8 @@ function GistManager({ gist, setGist }) {
                   <option>Faith and Encouragement</option>
                   <option>Artist Spotlight</option>
                   <option>Entertainment</option>
+              <option>Birthday</option>
+              <option>Awards</option>
                   <option>Sports</option>
                   <option>Politics</option>
                   <option>Health and Well-being</option>
