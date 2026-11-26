@@ -247,6 +247,26 @@ function UploadForm({ onUpload, prefill }) {
     catch (e) { setError("AI: " + e.message); }
     setDescBusy(false);
   };
+  const [findBusy, setFindBusy] = useState(false);
+  const [findMsg, setFindMsg] = useState("");
+  const findLinks = async () => {
+    setFindMsg(""); setFindBusy(true);
+    try {
+      const { data: sess } = await supabase.auth.getSession();
+      const res = await fetch("https://mygospelhub.com.ng/api/ai/find-links", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${sess?.session?.access_token || ""}` }, body: JSON.stringify({ title, artist }) });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.error || "Request failed");
+      const got = [];
+      if (d.youtube) { got.push("YouTube"); if (type === "Video") { if (!videoUrl.trim()) setVideoUrl(d.youtube); } else if (!youtubeUrl.trim()) setYoutubeUrl(d.youtube); }
+      if (type === "Audio") {
+        if (d.spotify) { got.push("Spotify"); if (!spotifyUrl.trim()) setSpotifyUrl(d.spotify); }
+        if (d.audiomack) { got.push("Audiomack"); if (!audiomackUrl.trim()) setAudiomackUrl(d.audiomack); }
+        if (d.fan) { got.push("fan link"); if (!fanUrl.trim()) setFanUrl(d.fan); }
+      }
+      setFindMsg(got.length ? "Found: " + got.join(", ") + ". Open each link to confirm it is the right song." : (d.note || "No matching links found."));
+    } catch (e) { setFindMsg("Could not search: " + e.message); }
+    setFindBusy(false);
+  };
   const [lyrics, setLyrics] = useState("");
   const [videoUrl, setVideoUrl] = useState("");
   const [mediaFile, setMediaFile] = useState(null);
@@ -395,7 +415,7 @@ function UploadForm({ onUpload, prefill }) {
   }
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 mb-6">
+    <div id="upload-form" className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 mb-6">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-semibold text-zinc-100">Upload new song or video</h3>
         <button onClick={reset} className="text-zinc-500 hover:text-zinc-300"><X size={18} /></button>
@@ -495,6 +515,10 @@ function UploadForm({ onUpload, prefill }) {
         <p className="text-[11px] text-zinc-600 mt-1.5">Large files may take a moment to upload depending on your connection.</p>
       </div>
 
+      <div className="mb-4">
+        <button type="button" onClick={findLinks} disabled={findBusy || title.trim().length < 2 || artist.trim().length < 2} className="text-xs border border-amber-500/40 text-amber-400 hover:bg-amber-500/10 disabled:opacity-50 rounded-lg px-3 py-2">{findBusy ? "Searching…" : "🔎 Find links with AI (from title + artist)"}</button>
+        {findMsg && <p className="text-xs text-zinc-500 mt-2">{findMsg}</p>}
+      </div>
       {type === "Audio" && (
         <div className="mb-4 space-y-3">
           <p className="text-[11px] text-zinc-600">Platform links (all optional — add the ones you have, with or without a file)</p>
@@ -905,7 +929,7 @@ function MusicLeads({ onUse }) {
     let found = {};
     try {
       const { data: sess } = await supabase.auth.getSession();
-      const res = await fetch("https://mygospelhub.com.ng/api/ai/find-links", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${sess?.session?.access_token || ""}` }, body: JSON.stringify({ url: l.url }) });
+      const res = await fetch("https://mygospelhub.com.ng/api/ai/find-links", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${sess?.session?.access_token || ""}` }, body: JSON.stringify({ url: l.url }), signal: AbortSignal.timeout(20000) });
       found = await res.json().catch(() => ({}));
     } catch (e) { found = {}; }
     let t = (l.title || "").replace(/\s*[\[(][^\])]*(official|video|audio|lyrics|mp3|download)[^\])]*[\])]/gi, "").replace(/\s+[-–|]\s+[^-–|]*$/, (m) => (/\.(com|ng|net)|news|blog|radio|boiz|gist/i.test(m) ? "" : m)).trim();
@@ -916,6 +940,7 @@ function MusicLeads({ onUse }) {
     setMsg(got.length ? `Found: ${got.join(", ")}. Check them in the form.` : (found.note || "No music links found. Paste them yourself in the form."));
     onUse({ n: Date.now(), title: t, artist, type: l.kind === "song" ? "Audio" : "Video", notes: `${l.snippet || ""}`.trim(), youtube: l.kind === "song" ? (found.youtube || "") : "", videoUrl: l.kind === "video" ? (found.youtube || "") : "", spotify: found.spotify || "", audiomack: found.audiomack || "", fan: found.fan || "" });
     setLeads(leads.filter(x => x.id !== l.id));
+    setTimeout(() => { const f = document.getElementById("upload-form"); if (f) f.scrollIntoView({ behavior: "smooth", block: "start" }); }, 250);
     await supabase.from("ai_leads").update({ status: "drafted" }).eq("id", l.id);
     setBusy(false);
   };
@@ -935,7 +960,7 @@ function MusicLeads({ onUse }) {
               <p className="text-xs text-zinc-500 mt-0.5">{l.source || "Source"} {l.published_at ? "· " + timeAgo(l.published_at) : ""}</p>
               <div className="flex gap-2 mt-2 flex-wrap">
                 <a href={l.url} target="_blank" rel="noreferrer" className="text-xs border border-zinc-700 text-zinc-300 rounded-lg px-3 py-1.5">Open source</a>
-                <button onClick={() => use(l)} className="text-xs bg-amber-500 text-zinc-950 font-semibold rounded-lg px-3 py-1.5">Use in upload form</button>
+                <button onClick={() => use(l)} disabled={busy} className="text-xs bg-amber-500 text-zinc-950 font-semibold rounded-lg px-3 py-1.5 disabled:opacity-60">{busy ? "Working…" : "Use in upload form"}</button>
                 <button onClick={() => dismiss(l.id)} className="text-xs text-zinc-500 px-2 py-1.5">Dismiss</button>
               </div>
             </div>
