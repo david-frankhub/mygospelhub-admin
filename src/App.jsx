@@ -246,9 +246,18 @@ function Dashboard({ content, gist, users, comments }) {
   );
 }
 
+// Calls the MyGospelHub server through this admin's own address first (Vercel forwards it), then directly as a fallback.
+async function apiFetch(path, init) {
+  try {
+    const r = await fetch(path, init);
+    if ((r.headers.get("content-type") || "").includes("json")) return r;
+  } catch (e) { /* fall through to the direct address */ }
+  return fetch("https://mygospelhub.com.ng" + path, init);
+}
+
 async function aiDescribe(fields) {
   const { data: sess } = await supabase.auth.getSession();
-  const res = await fetch("https://mygospelhub.com.ng/api/ai/draft", {
+  const res = await apiFetch("/api/ai/draft", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${sess?.session?.access_token || ""}` },
     body: JSON.stringify({ mode: "describe", ...fields }),
@@ -289,7 +298,7 @@ function UploadForm({ onUpload, prefill }) {
     setFindMsg(""); setFindBusy(true);
     try {
       const { data: sess } = await supabase.auth.getSession();
-      const res = await fetch("https://mygospelhub.com.ng/api/ai/find-links", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${sess?.session?.access_token || ""}` }, body: JSON.stringify({ title, artist }) });
+      const res = await apiFetch("/api/ai/find-links", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${sess?.session?.access_token || ""}` }, body: JSON.stringify({ title, artist }) });
       const d = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(d.error || "Request failed");
       const got = [];
@@ -896,7 +905,7 @@ function FbShareModal({ item, initialText, table, onClose, onPosted }) {
     setBusy(true); setMsg("");
     try {
       const { data: sess } = await supabase.auth.getSession();
-      const res = await fetch("https://mygospelhub.com.ng/api/fb/post", {
+      const res = await apiFetch("/api/fb/post", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${sess?.session?.access_token || ""}` },
         body: JSON.stringify({ message: text, image_url: item.cover_url }),
@@ -959,7 +968,7 @@ function MusicLeads({ onUse }) {
     setBusy(true); setMsg("");
     try {
       const { data: sess } = await supabase.auth.getSession();
-      const res = await fetch("https://mygospelhub.com.ng/api/ai/fetch-leads", { method: "POST", headers: { Authorization: `Bearer ${sess?.session?.access_token || ""}` } });
+      const res = await apiFetch("/api/ai/fetch-leads", { method: "POST", headers: { Authorization: `Bearer ${sess?.session?.access_token || ""}` } });
       const d = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(d.error || "Request failed");
       setMsg(d.added ? `${d.added} new leads found (songs, videos and news).` : "Nothing new since last time.");
@@ -973,7 +982,7 @@ function MusicLeads({ onUse }) {
     let found = {};
     try {
       const { data: sess } = await supabase.auth.getSession();
-      const res = await fetch("https://mygospelhub.com.ng/api/ai/find-links", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${sess?.session?.access_token || ""}` }, body: JSON.stringify({ url: l.url }), signal: AbortSignal.timeout(20000) });
+      const res = await apiFetch("/api/ai/find-links", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${sess?.session?.access_token || ""}` }, body: JSON.stringify({ url: l.url }), signal: AbortSignal.timeout(20000) });
       found = await res.json().catch(() => ({}));
     } catch (e) { found = {}; }
     let t = (l.title || "").replace(/\s*[\[(][^\])]*(official|video|audio|lyrics|mp3|download)[^\])]*[\])]/gi, "").replace(/\s+[-–|]\s+[^-–|]*$/, (m) => (/\.(com|ng|net)|news|blog|radio|boiz|gist/i.test(m) ? "" : m)).trim();
@@ -1582,7 +1591,7 @@ function GistManager({ gist, setGist }) {
     setFbBusy(true); setFbMsg("");
     try {
       const { data: sess } = await supabase.auth.getSession();
-      const res = await fetch("https://mygospelhub.com.ng/api/fb/post", {
+      const res = await apiFetch("/api/fb/post", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${sess?.session?.access_token || ""}` },
         body: JSON.stringify({ message: fbText, image_url: fbItem.cover_url }),
@@ -1655,7 +1664,7 @@ function GistManager({ gist, setGist }) {
     setLeadsBusy(true); setLeadsMsg("");
     try {
       const { data: sess } = await supabase.auth.getSession();
-      const res = await fetch("https://mygospelhub.com.ng/api/ai/fetch-leads", { method: "POST", headers: { Authorization: `Bearer ${sess?.session?.access_token || ""}` } });
+      const res = await apiFetch("/api/ai/fetch-leads", { method: "POST", headers: { Authorization: `Bearer ${sess?.session?.access_token || ""}` } });
       const d = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(d.error || "Failed");
       setLeadsMsg(d.added ? `${d.added} new leads found.` : (d.found ? "Nothing new since last time." : "The news sources returned nothing. Details: " + (d.diag || []).join(", ")));
@@ -1682,7 +1691,7 @@ function GistManager({ gist, setGist }) {
     setAiBusy(true);
     try {
       const { data: sess } = await supabase.auth.getSession();
-      const callDraft = (len) => fetch("https://mygospelhub.com.ng/api/ai/draft", {
+      const callDraft = (len) => apiFetch("/api/ai/draft", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${sess?.session?.access_token || ""}` },
         body: JSON.stringify({ facts: aiFacts, length: len }),
@@ -1694,7 +1703,7 @@ function GistManager({ gist, setGist }) {
         try { res = await callDraft("short"); }
         catch (netErr2) {
           let reach = "unknown";
-          try { const p = await fetch("https://mygospelhub.com.ng/api/ai/ping", { cache: "no-store" }); reach = p.ok ? "server reachable but the AI request is blocked or dropped" : "server answered " + p.status; } catch { reach = "server NOT reachable from this phone/browser"; }
+          try { const p = await apiFetch("/api/ai/ping", { cache: "no-store" }); reach = p.ok ? "server reachable but the AI request is blocked or dropped" : "server answered " + p.status; } catch { reach = "server NOT reachable from this phone/browser"; }
           throw new Error("Failed to fetch (" + reach + ")");
         }
       }
