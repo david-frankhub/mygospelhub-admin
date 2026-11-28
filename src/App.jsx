@@ -280,7 +280,7 @@ function UploadForm({ onUpload, prefill }) {
   const writeDesc = async () => {
     setError(""); setDescBusy(true);
     try { setDescription(await aiDescribe({ title, artist, type, genre, producer, year, notes: description })); }
-    catch (e) { setError("AI: " + (e.message === "Failed to fetch" ? "Could not reach the server (network or blocked address). Check your connection and try again; if it keeps happening, tell me the address you opened the admin from." : e.message)); }
+    catch (e) { setError("AI: " + (e.message.startsWith("Failed to fetch") ? e.message + ". Tell me this exact message and the address you opened the admin from." : e.message)); }
     setDescBusy(false);
   };
   const [findBusy, setFindBusy] = useState(false);
@@ -1673,7 +1673,7 @@ function GistManager({ gist, setGist }) {
     setActiveLead(l.id);
     setAiFacts(`Headline: ${l.title}\nReported by: ${l.source || "unknown"}\nSummary: ${l.snippet || ""}\n\nMore facts (open "Read source", then type the key facts here in your own words):\n`);
     setOpen(true);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    setTimeout(() => document.getElementById("gist-form")?.scrollIntoView({ behavior: "smooth", block: "start" }), 250);
   };
 
   const generateWithAI = async () => {
@@ -1682,14 +1682,22 @@ function GistManager({ gist, setGist }) {
     setAiBusy(true);
     try {
       const { data: sess } = await supabase.auth.getSession();
-      const callDraft = () => fetch("https://mygospelhub.com.ng/api/ai/draft", {
+      const callDraft = (len) => fetch("https://mygospelhub.com.ng/api/ai/draft", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${sess?.session?.access_token || ""}` },
-        body: JSON.stringify({ facts: aiFacts, length: aiLength }),
+        body: JSON.stringify({ facts: aiFacts, length: len }),
       });
       let res;
-      try { res = await callDraft(); }
-      catch (netErr) { await new Promise(r => setTimeout(r, 1500)); res = await callDraft(); }
+      try { res = await callDraft(aiLength); }
+      catch (netErr) {
+        // Connection dropped (usually a long generation). Try again once with the Short length.
+        try { res = await callDraft("short"); }
+        catch (netErr2) {
+          let reach = "unknown";
+          try { const p = await fetch("https://mygospelhub.com.ng/api/ai/ping", { cache: "no-store" }); reach = p.ok ? "server reachable but the AI request is blocked or dropped" : "server answered " + p.status; } catch { reach = "server NOT reachable from this phone/browser"; }
+          throw new Error("Failed to fetch (" + reach + ")");
+        }
+      }
       const d = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error((d.error || "AI request failed.") + (d.debug ? " [" + d.debug.slice(0, 120) + "]" : ""));
       setTitle(d.title || ""); setCategory(d.category || "General"); setBody(d.body || ""); setMetaDesc(d.meta_description || "");
@@ -1858,7 +1866,7 @@ function GistManager({ gist, setGist }) {
       </div>
 
       {open && (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 mb-6">
+        <div id="gist-form" className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 mb-6">
           <div className="flex gap-4 mb-4">
             <div className="shrink-0">
               <label className="text-xs text-zinc-500 mb-1.5 block">Cover image</label>
