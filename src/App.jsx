@@ -280,7 +280,7 @@ function UploadForm({ onUpload, prefill }) {
   const writeDesc = async () => {
     setError(""); setDescBusy(true);
     try { setDescription(await aiDescribe({ title, artist, type, genre, producer, year, notes: description })); }
-    catch (e) { setError("AI: " + e.message); }
+    catch (e) { setError("AI: " + (e.message === "Failed to fetch" ? "Could not reach the server (network or blocked address). Check your connection and try again; if it keeps happening, tell me the address you opened the admin from." : e.message)); }
     setDescBusy(false);
   };
   const [findBusy, setFindBusy] = useState(false);
@@ -1682,11 +1682,14 @@ function GistManager({ gist, setGist }) {
     setAiBusy(true);
     try {
       const { data: sess } = await supabase.auth.getSession();
-      const res = await fetch("https://mygospelhub.com.ng/api/ai/draft", {
+      const callDraft = () => fetch("https://mygospelhub.com.ng/api/ai/draft", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${sess?.session?.access_token || ""}` },
         body: JSON.stringify({ facts: aiFacts, length: aiLength }),
       });
+      let res;
+      try { res = await callDraft(); }
+      catch (netErr) { await new Promise(r => setTimeout(r, 1500)); res = await callDraft(); }
       const d = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error((d.error || "AI request failed.") + (d.debug ? " [" + d.debug.slice(0, 120) + "]" : ""));
       setTitle(d.title || ""); setCategory(d.category || "General"); setBody(d.body || ""); setMetaDesc(d.meta_description || "");
