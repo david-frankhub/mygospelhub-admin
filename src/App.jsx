@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { LayoutDashboard, Music2, Newspaper, Users, Upload, Search, Bell, ChevronDown, MoreHorizontal, Check, X, Trash2, Edit3, Plus, Video, Lock, Eye, EyeOff, LogOut, Mail, Link as LinkIcon, Loader2, Inbox, Phone, Banknote } from "lucide-react";
+import { LayoutDashboard, Music2, Newspaper, Users, Upload, Search, Bell, ChevronDown, MoreHorizontal, Check, X, Trash2, Edit3, Plus, Video, Lock, Eye, EyeOff, LogOut, Mail, Link as LinkIcon, Loader2, Inbox, Phone, Banknote, Menu } from "lucide-react";
 
 // ---------- Supabase connection ----------
 // The anon key below is safe to use in frontend code — real security comes
@@ -114,15 +114,46 @@ function TopNavTab({ icon: Icon, label, active, onClick, badge }) {
   );
 }
 
-function StatCard({ label, value, sub }) {
+const TONES = {
+  amber: "bg-amber-500/15 text-amber-400",
+  green: "bg-emerald-500/15 text-emerald-400",
+  violet: "bg-violet-500/15 text-violet-400",
+  rose: "bg-rose-500/15 text-rose-400",
+};
+
+function StatCard({ label, value, sub, icon: Icon, tone = "amber" }) {
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
-      <div className="text-[11px] font-mono uppercase tracking-wider text-zinc-500 mb-2">{label}</div>
-      <div className="text-2xl font-semibold text-zinc-50 mb-1" style={{ fontFamily: "'Fraunces', serif" }}>{value}</div>
-      <div className="text-xs text-zinc-500">{sub}</div>
+    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-3.5 sm:p-5 flex items-center gap-3 min-w-0">
+      {Icon && (
+        <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center shrink-0 ${TONES[tone]}`}>
+          <Icon size={18} />
+        </div>
+      )}
+      <div className="min-w-0">
+        <div className="text-xl sm:text-2xl font-semibold text-zinc-50 leading-none" style={{ fontFamily: "'Fraunces', serif" }}>{value}</div>
+        <div className="text-[10px] sm:text-[11px] font-mono uppercase tracking-wider text-zinc-500 mt-1.5 truncate">{label}</div>
+        {sub && <div className="hidden sm:block text-xs text-zinc-600 mt-0.5">{sub}</div>}
+      </div>
     </div>
   );
 }
+
+function PageHero({ eyebrow, title, subtitle, children }) {
+  return (
+    <div className="relative overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900 p-5 sm:p-7 mb-5" style={{ backgroundImage: "radial-gradient(120% 140% at 100% 0%, rgba(245,158,11,0.18) 0%, rgba(245,158,11,0) 55%)" }}>
+      <div className="text-[11px] font-mono uppercase tracking-[0.18em] text-amber-400 mb-2">{eyebrow}</div>
+      <h1 className="text-2xl sm:text-3xl font-semibold text-zinc-50 leading-tight" style={{ fontFamily: "'Fraunces', serif" }}>{title}</h1>
+      {subtitle && <p className="text-sm text-zinc-400 mt-2 max-w-xl">{subtitle}</p>}
+      {children && <div className="mt-4 flex flex-wrap gap-2.5">{children}</div>}
+    </div>
+  );
+}
+
+const HeroBtn = ({ onClick, primary, children }) => (
+  <button onClick={onClick} className={`flex-1 sm:flex-none min-w-[140px] flex items-center justify-center gap-2 text-sm font-semibold px-4 py-3 rounded-xl transition-colors ${primary ? "bg-amber-500 hover:bg-amber-400 text-zinc-950" : "bg-zinc-800/70 hover:bg-zinc-800 text-zinc-100 border border-zinc-700"}`}>
+    {children}
+  </button>
+);
 
 function LoadingBlock({ label = "Loading..." }) {
   return (
@@ -161,15 +192,15 @@ function Dashboard({ content, gist, users, comments }) {
 
   return (
     <div>
-      <div className="grid grid-cols-4 gap-4 mb-8">
-        <StatCard label="Total Content" value={content.length} sub="songs & videos" />
-        <StatCard label="Live on Site" value={liveCount} sub="published now" />
-        <StatCard label="Gist Articles" value={gist.length} sub="published & draft" />
-        <StatCard label="Registered Users" value={users.length} sub="total" />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-5">
+        <StatCard label="Total content" value={content.length} sub="songs & videos" icon={Music2} tone="amber" />
+        <StatCard label="Live on site" value={liveCount} sub="published now" icon={Check} tone="green" />
+        <StatCard label="Gist articles" value={gist.length} sub="published & draft" icon={Newspaper} tone="violet" />
+        <StatCard label="Users" value={users.length} sub="registered" icon={Users} tone="rose" />
       </div>
 
-      <div className="grid grid-cols-2 gap-5">
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
+        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold text-zinc-100">Needs your attention</h3>
           </div>
@@ -231,6 +262,11 @@ const GENRES = ["Worship", "Praise", "Choir", "Yoruba", "Igbo", "Hausa", "Live S
 
 function UploadForm({ onUpload, prefill }) {
   const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const h = (e) => { if (e.detail === "content") { setOpen(true); setTimeout(() => document.getElementById("upload-form")?.scrollIntoView({ behavior: "smooth", block: "start" }), 200); } };
+    window.addEventListener("mgh-open", h);
+    return () => window.removeEventListener("mgh-open", h);
+  }, []);
   const [title, setTitle] = useState("");
   const [artist, setArtist] = useState("");
   const [type, setType] = useState("Video");
@@ -433,7 +469,7 @@ function UploadForm({ onUpload, prefill }) {
             <input type="file" accept="image/*" onChange={handleCoverSelect} className="hidden" />
           </label>
         </div>
-        <div className="flex-1 grid grid-cols-2 gap-4">
+        <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="text-xs text-zinc-500 mb-1.5 block">Title</label>
             <input value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Nothing Is Impossible" className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50" />
@@ -456,7 +492,7 @@ function UploadForm({ onUpload, prefill }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-4 mb-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
         <div>
           <label className="text-xs text-zinc-500 mb-1.5 block">Year</label>
           <input type="number" value={year} onChange={e => setYear(e.target.value)} placeholder="2026" className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50" />
@@ -706,7 +742,7 @@ function EditContentForm({ item, onSave, onCancel }) {
             <input type="file" accept="image/*" onChange={handleCoverSelect} className="hidden" />
           </label>
         </div>
-        <div className="flex-1 grid grid-cols-2 gap-4">
+        <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="text-xs text-zinc-500 mb-1.5 block">Title</label>
             <input value={title} onChange={e => setTitle(e.target.value)} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50" />
@@ -726,7 +762,7 @@ function EditContentForm({ item, onSave, onCancel }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 mb-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
         <div>
           <label className="text-xs text-zinc-500 mb-1.5 block">Producer <span className="text-zinc-600">(optional)</span></label>
           <input value={producer} onChange={e => setProducer(e.target.value)} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50" />
@@ -1286,8 +1322,8 @@ function EditGistForm({ item, onSave, onCancel }) {
           </label>
           <button type="button" onClick={makeAutoCover} className="mt-2 w-24 text-[11px] border border-amber-500/40 text-amber-400 rounded-lg py-1.5">Auto cover</button>
         </div>
-        <div className="flex-1 grid grid-cols-3 gap-4">
-          <div className="col-span-2">
+        <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="sm:col-span-2">
             <label className="text-xs text-zinc-500 mb-1.5 block">Headline</label>
             <input value={title} onChange={e => setTitle(e.target.value)} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50" />
           </div>
@@ -1313,11 +1349,11 @@ function EditGistForm({ item, onSave, onCancel }) {
               <option>General</option>
             </select>
           </div>
-          <div className="col-span-3">
+          <div className="sm:col-span-3">
             <label className="text-xs text-zinc-500 mb-1.5 block">Posted by <span className="text-zinc-600">(shown as "By ...")</span></label>
             <input value={uploadedBy} onChange={e => setUploadedBy(e.target.value)} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50" />
           </div>
-          <div className="col-span-3">
+          <div className="sm:col-span-3">
             <label className="text-xs text-zinc-500 mb-1.5 block">Article body</label>
             <textarea value={body} onChange={e => setBody(e.target.value)} rows={5} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50 resize-none" />
           </div>
@@ -1329,7 +1365,7 @@ function EditGistForm({ item, onSave, onCancel }) {
           <input type="checkbox" checked={overlayOn} onChange={e => setOverlayOn(e.target.checked)} /> Add headline + MyGospelHub logo to a new cover I upload
         </label>
         {(overlayOn || useGen) && (
-          <div className="mt-3 grid grid-cols-2 gap-3">
+          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="text-xs text-zinc-500 mb-1 block">Cover shape</label>
               <select value={format} onChange={e => setFormat(e.target.value)} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none">
@@ -1475,6 +1511,11 @@ async function composeCover({ src, title, category, caption, format }) {
 function GistManager({ gist, setGist }) {
   const [editingId, setEditingId] = useState(null);
   const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const h = (e) => { if (e.detail === "gist") setOpen(true); };
+    window.addEventListener("mgh-open", h);
+    return () => window.removeEventListener("mgh-open", h);
+  }, []);
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("Community");
   const [uploadedBy, setUploadedBy] = useState("MyGospelHub");
@@ -1828,8 +1869,8 @@ function GistManager({ gist, setGist }) {
               </label>
               <button type="button" onClick={makeBrandedCover} className="mt-2 w-24 text-[11px] border border-amber-500/40 text-amber-400 rounded-lg py-1.5">Auto cover</button>
             </div>
-            <div className="flex-1 grid grid-cols-3 gap-4">
-              <div className="col-span-2">
+            <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="sm:col-span-2">
                 <label className="text-xs text-zinc-500 mb-1.5 block">Headline</label>
                 <input value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Behind the scenes at..." className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50" />
               </div>
@@ -1855,11 +1896,11 @@ function GistManager({ gist, setGist }) {
                   <option>General</option>
                 </select>
               </div>
-              <div className="col-span-3">
+              <div className="sm:col-span-3">
                 <label className="text-xs text-zinc-500 mb-1.5 block">Posted by <span className="text-zinc-600">(shown as "By ...")</span></label>
                 <input value={uploadedBy} onChange={e => setUploadedBy(e.target.value)} placeholder="MyGospelHub" className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50" />
               </div>
-              <div className="col-span-3">
+              <div className="sm:col-span-3">
                 <label className="text-xs text-zinc-500 mb-1.5 block">Cover from your site <span className="text-zinc-600">(artiste name → covers you already uploaded)</span></label>
                 <div className="flex gap-2">
                   <input value={artistQ} onChange={e => setArtistQ(e.target.value)} placeholder="e.g. Mercy Chinwo" className="flex-1 bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50" />
@@ -1872,12 +1913,12 @@ function GistManager({ gist, setGist }) {
                   </div>
                 )}
               </div>
-              <div className="col-span-3 rounded-lg border border-zinc-800 p-3">
+              <div className="sm:col-span-3 rounded-lg border border-zinc-800 p-3">
                 <label className="flex items-center gap-2 text-xs text-zinc-300">
                   <input type="checkbox" checked={overlayOn} onChange={e => setOverlayOn(e.target.checked)} /> Add headline + MyGospelHub logo to the cover
                 </label>
                 {(overlayOn || useGen) && (
-                  <div className="mt-3 grid grid-cols-2 gap-3">
+                  <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="text-xs text-zinc-500 mb-1 block">Cover shape</label>
                       <select value={format} onChange={e => setFormat(e.target.value)} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none">
@@ -1894,7 +1935,7 @@ function GistManager({ gist, setGist }) {
                 {coverNote && <p className="text-xs text-amber-400 mt-2">{coverNote}</p>}
                 {composed && <img src={composed.url} alt="Cover preview" className="mt-3 w-full max-w-xs rounded-lg border border-zinc-800" />}
               </div>
-              <div className="col-span-3 rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
+              <div className="sm:col-span-3 rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
                 <label className="text-xs text-amber-400 mb-1.5 block">AI draft helper <span className="text-zinc-500">(free) — paste facts or notes; it writes a draft you must check before publishing</span></label>
                 <textarea value={aiFacts} onChange={e => setAiFacts(e.target.value)} placeholder="Paste the facts: who, what, when, where, quotes you have permission to use..." rows={4} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50 resize-none" />
                 <div className="mt-2 flex items-center gap-2 flex-wrap">
@@ -1906,11 +1947,11 @@ function GistManager({ gist, setGist }) {
                   <button type="button" onClick={generateWithAI} disabled={aiBusy} className="bg-amber-500 hover:bg-amber-400 disabled:opacity-60 text-zinc-950 text-xs font-semibold px-3 py-2 rounded-lg">{aiBusy ? "Writing draft..." : "Generate draft with AI"}</button>
                 </div>
               </div>
-              <div className="col-span-3">
+              <div className="sm:col-span-3">
                 <label className="text-xs text-zinc-500 mb-1.5 block">Article body</label>
                 <textarea value={body} onChange={e => setBody(e.target.value)} placeholder="Write the full story here..." rows={5} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50 resize-none" />
               </div>
-              <div className="col-span-3">
+              <div className="sm:col-span-3">
                 <label className="text-xs text-zinc-500 mb-1.5 block">Google description <span className="text-zinc-600">(SEO, max 160 characters — AI fills this)</span> <span className="text-zinc-600">{metaDesc.length}/160</span></label>
                 <input value={metaDesc} maxLength={160} onChange={e => setMetaDesc(e.target.value)} placeholder="Short summary shown in Google results" className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 outline-none focus:border-amber-500/50" />
               </div>
@@ -1931,7 +1972,34 @@ function GistManager({ gist, setGist }) {
           No gist articles yet — tap "New article" to write your first one.
         </div>
       ) : (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+        <>
+        <div className="flex flex-col gap-3 md:hidden">
+          {gist.map(g => (
+            <div key={g.id} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4">
+              <div className="flex items-start gap-3 mb-3">
+                <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-rose-800 to-zinc-900 overflow-hidden shrink-0 flex items-center justify-center">
+                  {g.cover_url ? <img src={g.cover_url} alt="" className="w-full h-full object-cover" /> : <Newspaper size={18} className="text-amber-400" />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-zinc-100 font-medium leading-snug">{g.title}</div>
+                  <div className="text-xs text-zinc-500 mt-1">{g.category} · <span className="font-mono">{formatCount(g.reads)} reads</span></div>
+                </div>
+                <StatusPill status={g.status} />
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => setEditingId(g.id)} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium text-zinc-300 bg-zinc-800/60 rounded-lg"><Edit3 size={13} /> Edit</button>
+                <button onClick={() => toggleStatus(g.id, g.status)} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium text-zinc-300 bg-zinc-800/60 rounded-lg">{g.status === "Published" ? <X size={13} /> : <Check size={13} />} {g.status === "Published" ? "Unpublish" : "Publish"}</button>
+                <button onClick={() => remove(g.id)} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium text-zinc-300 bg-zinc-800/60 rounded-lg"><Trash2 size={13} /> Delete</button>
+              </div>
+              {g.status === "Published" && (
+                <button onClick={() => openFb(g)} className={"mt-2 w-full py-2.5 text-xs font-medium rounded-lg border " + (g.fb_post_id ? "border-emerald-500/40 text-emerald-400" : "border-zinc-700 text-zinc-300")}>
+                  {g.fb_post_id ? "Posted to Facebook ✓ (post again)" : "Post to Facebook"}
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+        <div className="hidden md:block bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-zinc-800 text-left text-zinc-500 text-xs font-mono uppercase tracking-wider">
@@ -1971,6 +2039,7 @@ function GistManager({ gist, setGist }) {
             </tbody>
           </table>
         </div>
+        </>
       )}
     </div>
   );
@@ -2018,7 +2087,22 @@ function UsersAndComments({ users, setUsers, comments, setComments, role }) {
             No registered users yet.
           </div>
         ) : (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+        <>
+        <div className="flex flex-col gap-3 md:hidden">
+          {users.map(u => (
+            <div key={u.id} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 flex items-center gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="text-sm text-zinc-100 font-medium truncate">{u.email}</div>
+                <div className="text-xs text-zinc-500 mt-1">{u.role} · <span className="font-mono">{u.created_at ? u.created_at.slice(0, 10) : ""}</span></div>
+              </div>
+              <StatusPill status={u.status === "active" ? "Active" : "Flagged"} />
+              {isSuperAdmin && (
+                <button onClick={() => toggleUserStatus(u.id, u.status === "active" ? "Active" : "Flagged")} className="text-xs text-zinc-400 border border-zinc-700 rounded-lg px-2.5 py-1.5">{u.status === "active" ? "Flag" : "Unflag"}</button>
+              )}
+            </div>
+          ))}
+        </div>
+        <div className="hidden md:block bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-zinc-800 text-left text-zinc-500 text-xs font-mono uppercase tracking-wider">
@@ -2050,6 +2134,7 @@ function UsersAndComments({ users, setUsers, comments, setComments, role }) {
             </tbody>
           </table>
         </div>
+        </>
         )
       ) : (
         comments.length === 0 ? (
@@ -2499,6 +2584,7 @@ function Dashboard_Shell({ onLogout, role, userEmail }) {
   const flaggedCount = comments.filter(c => c.status === "Flagged").length + users.filter(u => u.status === "Flagged" || u.status === "flagged").length;
   const openSubmissions = submissions.filter(s => s.status === "awaiting_payment" || s.status === "paid").length;
 
+  const [menuOpen, setMenuOpen] = useState(false);
   const nav = [
     { key: "dashboard", label: "Overview", icon: LayoutDashboard },
     { key: "submissions", label: "Submissions", icon: Inbox, badge: openSubmissions || null },
@@ -2517,19 +2603,23 @@ function Dashboard_Shell({ onLogout, role, userEmail }) {
               <span className="text-lg font-semibold">MyGospelHub</span>
               <span className="text-amber-400 text-lg">.</span>
             </div>
-            <div className="text-[10px] font-mono text-zinc-600 uppercase tracking-wider -mt-0.5">Admin Console</div>
+            <div className="text-[10px] font-mono text-zinc-600 uppercase tracking-[0.2em] -mt-0.5">Admin Workspace</div>
           </div>
           <div className="flex items-center gap-3 min-w-0">
-            <div className="hidden sm:block text-right min-w-0">
+            <div className="hidden md:block text-right min-w-0">
               <div className="text-xs text-zinc-300 font-medium">{role === "super_admin" ? "Super Admin" : "Admin"}</div>
               <div className="text-[11px] text-zinc-600 truncate max-w-[180px]">{userEmail}</div>
             </div>
-            <button onClick={onLogout} title="Sign out" className="p-2 text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors shrink-0">
+            <button onClick={onLogout} title="Sign out" className="hidden md:block p-2 text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors shrink-0">
               <LogOut size={16} />
+            </button>
+            <button onClick={() => setMenuOpen(true)} aria-label="Open menu" className="md:hidden relative p-2.5 rounded-xl border border-zinc-800 bg-zinc-900 text-zinc-100">
+              <Menu size={20} />
+              {(flaggedCount + openSubmissions) > 0 && <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-rose-500"></span>}
             </button>
           </div>
         </div>
-        <div className="max-w-6xl mx-auto px-4 sm:px-8 pb-3">
+        <div className="hidden md:block max-w-6xl mx-auto px-4 sm:px-8 pb-3">
           <nav className="flex items-center gap-1.5 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
             {nav.map(item => (
               <TopNavTab key={item.key} icon={item.icon} label={item.label} active={page === item.key} onClick={() => setPage(item.key)} badge={item.badge} />
@@ -2538,12 +2628,65 @@ function Dashboard_Shell({ onLogout, role, userEmail }) {
         </div>
       </header>
 
+      {/* Mobile menu drawer */}
+      {menuOpen && (
+        <div className="fixed inset-0 z-40 md:hidden">
+          <div className="absolute inset-0 bg-black/70" onClick={() => setMenuOpen(false)}></div>
+          <aside className="absolute right-0 top-0 bottom-0 w-[84%] max-w-xs bg-zinc-950 border-l border-zinc-800 flex flex-col">
+            <div className="h-16 px-5 flex items-center justify-between border-b border-zinc-800">
+              <div>
+                <div className="flex items-baseline gap-0.5" style={{ fontFamily: "'Fraunces', serif" }}>
+                  <span className="text-lg font-semibold">MyGospelHub</span><span className="text-amber-400 text-lg">.</span>
+                </div>
+                <div className="text-[10px] font-mono text-zinc-600 uppercase tracking-[0.2em] -mt-0.5">Admin Workspace</div>
+              </div>
+              <button onClick={() => setMenuOpen(false)} aria-label="Close menu" className="p-2.5 rounded-xl border border-zinc-800 bg-zinc-900"><X size={18} /></button>
+            </div>
+            <nav className="flex-1 overflow-y-auto p-3 space-y-1.5">
+              {nav.map(item => {
+                const Icon = item.icon; const active = page === item.key;
+                return (
+                  <button key={item.key} onClick={() => { setPage(item.key); setMenuOpen(false); window.scrollTo(0, 0); }} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-[15px] font-medium text-left ${active ? "bg-amber-500 text-zinc-950" : "text-zinc-300 bg-zinc-900/60 border border-zinc-800/80"}`}>
+                    <Icon size={18} />
+                    <span className="flex-1">{item.label}</span>
+                    {item.badge ? <span className={`text-[11px] font-mono px-2 py-0.5 rounded-full ${active ? "bg-zinc-950/20" : "bg-rose-500/15 text-rose-400"}`}>{item.badge}</span> : null}
+                  </button>
+                );
+              })}
+            </nav>
+            <div className="p-4 border-t border-zinc-800">
+              <div className="text-xs text-zinc-300 font-medium">{role === "super_admin" ? "Super Admin" : "Admin"}</div>
+              <div className="text-[11px] text-zinc-600 truncate mb-3">{userEmail}</div>
+              <button onClick={onLogout} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-zinc-800 text-rose-400 text-sm font-medium"><LogOut size={16} /> Sign out</button>
+            </div>
+          </aside>
+        </div>
+      )}
+
       {/* Main */}
-      <main className="max-w-6xl mx-auto px-4 sm:px-8 py-8">
+      <main className="max-w-6xl mx-auto px-4 sm:px-8 py-5 sm:py-8">
         {loading && <LoadingBlock label="Loading dashboard..." />}
         {!loading && loadError && <ErrorBlock message={loadError} onRetry={loadAll} />}
         {!loading && !loadError && (
           <>
+            {page === "dashboard" && (
+              <PageHero eyebrow="Overview" title="Welcome back" subtitle="Everything happening on MyGospelHub, in one place.">
+                <HeroBtn primary onClick={() => { setPage("content"); setTimeout(() => window.dispatchEvent(new CustomEvent("mgh-open", { detail: "content" })), 150); }}><Plus size={16} /> Upload song or video</HeroBtn>
+                <HeroBtn onClick={() => { setPage("gist"); setTimeout(() => window.dispatchEvent(new CustomEvent("mgh-open", { detail: "gist" })), 150); }}><Newspaper size={16} /> New gist article</HeroBtn>
+              </PageHero>
+            )}
+            {page === "submissions" && <PageHero eyebrow="Public uploads" title="Submissions" subtitle="Songs, videos and articles sent in by artists. Approve or reject each one." />}
+            {page === "content" && (
+              <PageHero eyebrow="Music management" title="Songs & Videos" subtitle="Upload, edit, publish and share your catalogue.">
+                <HeroBtn primary onClick={() => window.dispatchEvent(new CustomEvent("mgh-open", { detail: "content" }))}><Plus size={16} /> Upload song or video</HeroBtn>
+              </PageHero>
+            )}
+            {page === "gist" && (
+              <PageHero eyebrow="News and gist" title="Gist articles" subtitle="Write, generate with AI, publish and post to Facebook.">
+                <HeroBtn primary onClick={() => window.dispatchEvent(new CustomEvent("mgh-open", { detail: "gist" }))}><Plus size={16} /> New article</HeroBtn>
+              </PageHero>
+            )}
+            {page === "users" && <PageHero eyebrow="Community" title="Users and comments" subtitle="Keep the community healthy: review comments and flagged users." />}
             {page === "dashboard" && <Dashboard content={content} gist={gist} users={users} comments={comments} />}
             {page === "submissions" && (
               submissionsError
